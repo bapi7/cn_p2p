@@ -28,16 +28,8 @@ public class StartRemotePeers {
 		try {
 			BufferedReader in = new BufferedReader(new FileReader("PeerInfo.cfg"));
 			while((st = in.readLine()) != null) {
-				
 				 String[] tokens = st.split("\\s+");
-		    	 //System.out.println("tokens begin ----");
-			     //for (int x=0; x<tokens.length; x++) {
-			     //    System.out.println(tokens[x]);
-			     //}
-		         //System.out.println("tokens end ----");
-			    
 			     peerInfoVector.addElement(new RemotePeerInfo(tokens[0], tokens[1], tokens[2]));
-			
 			}
 			
 			in.close();
@@ -66,7 +58,7 @@ public class StartRemotePeers {
 				
 				// *********************** IMPORTANT *************************** //
 				// If your program is JAVA, use this line.
-				Runtime.getRuntime().exec("ssh bapiraju@" + pInfo.peerAddress + " cd " + path + "; java peerProcess " + pInfo.peerId);
+				Runtime.getRuntime().exec("ssh bapiraju@" + pInfo.peerAddress + " java -cp /cise/homes/bapiraju/cn_p2p/ peerProcess " + pInfo.peerId);
 				
 				// If your program is C/C++, use this line instead of the above line. 
 				//Runtime.getRuntime().exec("ssh " + pInfo.peerAddress + " cd " + path + "; ./peerProcess " + pInfo.peerId);
