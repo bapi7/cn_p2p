@@ -1,4 +1,5 @@
 import java.net.*;
+import java.awt.TrayIcon.MessageType;
 import java.io.*;
 import java.nio.*;
 import java.nio.channels.*;
@@ -15,6 +16,7 @@ public class ClientThread extends Thread{
 		try {
 			this.requestSocket = s;
 			this.isClient = isClient;
+			
 			//initialize inputStream and outputStream
 			out = new BufferedOutputStream(requestSocket.getOutputStream());
 			out.flush();
@@ -23,12 +25,12 @@ public class ClientThread extends Thread{
 	        if(isClient) {
 	        	//sending handshake message to the peer
 	        	this.peerID = peerID;
-                sendMessage(constructHandshakeMessage(peerID));
+                sendMessage(TCPMsgUtil.constructHandshakeMessage(peerID));
                 receiveHandshakeMessage();
 	        } else {
-                Integer z = receiveHandshakeMessage();
-                this.peerID = z.toString();
-                sendMessage(constructHandshakeMessage(peerID));
+                Integer rcv = receiveHandshakeMessage();
+                this.peerID = rcv.toString();
+                sendMessage(TCPMsgUtil.constructHandshakeMessage(peerID));
 	        }
 
 	        if(peerID == "-1")
@@ -36,55 +38,35 @@ public class ClientThread extends Thread{
 	        else
                 this.setName("Peer : " + peerID);
 	        
+	        sendBitFieldMessage();
 		} catch(IOException ioe) {
 			ioe.printStackTrace();
 		}
 	}
 	
-	public void run()
-	{
-		/*try{
-		
-			while(true)
-			{
+	public void run() {
+		try {
+			BufferedInputStream inp_stream = new BufferedInputStream(requestSocket.getInputStream());
+			//while(!stoppingCondition) {
+				
 				//sendMessage(message);
 				//Receive the upperCase sentence from the server
 				//MESSAGE = (String)in.readObject();
 				//show the message to the user
 				//System.out.println("Receive message: " + MESSAGE);
-			}
-		}
-		catch (ConnectException e) {
-			System.err.println("Connection refused. You need to initiate a server first.");
-		} 
-		catch ( ClassNotFoundException e ) {
-        	System.err.println("Class not found");
-    	}
-		catch(UnknownHostException unknownHost){
-			System.err.println("You are trying to connect to an unknown host!");
-		}
-		catch(IOException ioException){
+			//}
+		} catch(IOException ioException){
 			ioException.printStackTrace();
-		}
-		finally{
+		} finally{
 			//Close connections
 			try{
 				in.close();
 				out.close();
 				requestSocket.close();
-			}
-			catch(IOException ioException){
+			} catch(IOException ioException){
 				ioException.printStackTrace();
 			}
-		}*/
-	}
-	
-	byte[] constructHandshakeMessage(String peerID) {
-		String header = "P2PFILESHARINGPROJ";
-		byte[] zero_bits = {0,0,0,0,0,0,0,0,0,0};
-		byte[] header_and_zerobits = TCPMsgUtil.appendByteArray(header.getBytes(), zero_bits);
-		byte[] handshakeMsg = TCPMsgUtil.appendByteArray(header_and_zerobits, peerID.getBytes());
-		return handshakeMsg;
+		}
 	}
 	
 	public int receiveHandshakeMessage() {
@@ -99,23 +81,36 @@ public class ClientThread extends Thread{
             /*if(isClient)
                 if(peerHandShakeMap.containsKey(pId) && peerHandShakeMap.get(pId) == false)
                         peerHandShakeMap.put(pId, true);*/
-        }
-        catch (IOException ioe) {
+        } catch (IOException ioe) {
         	ioe.printStackTrace();
         }
 		return pId;
 	}
 	
-	void sendMessage(byte[] msg)
-	{
-		try{
+	public void sendBitFieldMessage() {
+		try {
+            byte[] val = new byte[10]; 
+            //getBitFieldValue();
+            byte[] msg = TCPMsgUtil.constructActualMessage(TCPMsgUtil.MessageType.BITFIELD, val);
+            out.write(msg);
+            out.flush();
+        } catch (IOException ioe) {
+        	ioe.printStackTrace();
+        }
+	}
+	
+	void sendMessage(byte[] msg) {
+		try {
 			//stream write the message
 			out.write(msg);
 			out.flush();
-		}
-		catch(IOException ioException){
+		} catch(IOException ioException){
 			ioException.printStackTrace();
 		}
+	}
+	
+	static {
+		
 	}
 	
 }

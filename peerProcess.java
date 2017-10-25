@@ -84,7 +84,6 @@ public class peerProcess {
 		for(RemotePeerInfo pInfo : connectedPeers) {
 			try {
 				ClientThread client = new ClientThread(new Socket(pInfo.peerAddress, Integer.parseInt(pInfo.peerPort)), true, pInfo.peerId);
-				client.peerID = args[0];
 				client.start();
 				ClientThreads.add(client);
 			} catch(Exception ex) {
