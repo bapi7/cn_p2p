@@ -1,4 +1,6 @@
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.net.*;
 import java.util.*;
 
@@ -6,106 +8,176 @@ public class peerProcess {
 
 	public static List<ClientThread> ClientThreads = Collections.synchronizedList(new ArrayList<ClientThread>());
 
-	public Vector<RemotePeerInfo> peerInfoVector;
-	Integer NumberOfPreferredNeighbors;
-	Integer UnchokingInterval;
-	Integer OptimisticUnchokingInterval;
-	String FileName;
-	Integer FileSize;
-	Integer PieceSize;
 	Integer port = 8000;
+	
 	static Integer Id;
 
-	public void readConfiguration()
+	
+	public static void main(String[] args) throws Exception 
 	{
-		String st;
-		int i1;
-		peerInfoVector = new Vector<RemotePeerInfo>();
-
-		try {
-			BufferedReader in = new BufferedReader(new FileReader("Common.cfg"));
-			while((st = in.readLine()) != null) {
-				String[] tokens = st.split("\\s+");
-				switch(tokens[0]) {
-				case "NumberOfPreferredNeighbors":
-					NumberOfPreferredNeighbors = Integer.parseInt(tokens[1]);
-					break;
-				case "UnchokingInterval":
-					UnchokingInterval = Integer.parseInt(tokens[1]);
-					break;
-				case "OptimisticUnchokingInterval":
-					OptimisticUnchokingInterval = Integer.parseInt(tokens[1]);
-					break;
-				case "FileName":
-					FileName = tokens[1];
-					break;
-				case "FileSize":
-					FileSize = Integer.parseInt(tokens[1]);
-					break;
-				case "PieceSize":
-					PieceSize = Integer.parseInt(tokens[1]);
-					break;
-				}
-			}
-
-			in = new BufferedReader(new FileReader("PeerInfo.cfg"));
-			while((st = in.readLine()) != null) {
-				String[] tokens = st.split("\\s+");
-		    	peerInfoVector.addElement(new RemotePeerInfo(tokens[0], tokens[1], tokens[2],tokens[3]));
-			}
-
-			in.close();
-		}
-		catch (Exception ex) {
-			System.out.println(ex.toString());
-		}
-	}
-
-	public static void main(String[] args) throws Exception {
+		
 		System.out.println("The peer process " + args[0] + " is running.");
+		
 		peerProcess peer = new peerProcess();
-		peer.readConfiguration();
-
+		
+		//Storing the peer Id of this peer
 		Id = Integer.parseInt(args[0]);
+		
+		//Initializing a config instance to use across all client threads
+		config cfg = new config();
+		
+		//This list maintains all peers that have already started
 		List<RemotePeerInfo> connectedPeers = new ArrayList<RemotePeerInfo>();
+		
+		//This list maintains all peers that have yet to be started
 		List<RemotePeerInfo> futurePeers = new ArrayList<RemotePeerInfo>();
+		
+		int has_file = 0;
+		
 		//Gather all the peer processes that have already started
-		for(RemotePeerInfo rpi : peer.peerInfoVector) {
-			if(Integer.parseInt(rpi.peerId) < Integer.parseInt(args[0]))
+		for(RemotePeerInfo rpi : cfg.peerInfoVector) 
+		{
+			
+			if(Integer.parseInt(rpi.peerId) < Integer.parseInt(args[0])) 
+			{
+				
 				connectedPeers.add(rpi);
-			else if(Integer.parseInt(rpi.peerId) == Integer.parseInt(args[0]))
+				
+			}
+			
+			else if(Integer.parseInt(rpi.peerId) == Integer.parseInt(args[0])) 
+			{
+				
 				peer.port = Integer.parseInt(rpi.peerPort);
-			else
+				
+				if(rpi.peerHasFile == "1")
+					has_file = 1;
+				
+			}
+			
+			else 
+			{
+				
 				futurePeers.add(rpi);
+				
+			}
 
 		}
 
-		config cfg = new config();
-		//Connect to the peers that have already started
-		for(RemotePeerInfo pInfo : connectedPeers) {
-			try {
-				ClientThread client = new ClientThread(new Socket(pInfo.peerAddress, Integer.parseInt(pInfo.peerPort)), true, pInfo.peerId,cfg);
-				client.start();
-				ClientThreads.add(client);
-			} catch(Exception ex) {
-				ex.printStackTrace();
+		int size = cfg.noOfBytes;
+		int pieces = cfg.noOfPieces;
+		
+		byte[] bitField = new byte[size];
+		byte[] fileData = new byte[cfg.FileSize];
+		//Check if the peer has the file and then set the all the bits to 1 if it has the file and 0 if doesn't
+		if(has_file == 1)
+		{
+			
+			try 
+			{
+				File file = new File("peer_"+ peerProcess.Id + "/" + cfg.FileName);
+			
+				FileInputStream fdata = new FileInputStream(file);
+			
+				fdata.read(fileData);
+				fdata.close();
+			
+			} 
+			catch(FileNotFoundException fnfe) 
+			{
+				fnfe.printStackTrace();
 			}
+			
+			if (pieces % 8 == 0) 
+            {
+            
+            	Arrays.fill(bitField, (byte) 255);
+                
+            } 
+            else 
+            {
+                int last = (int) pieces % 8;
+               
+                Arrays.fill(bitField, (byte) 255); 
+                
+                bitField[bitField.length - 1] = 0; 
+                
+                	                
+                while (last != 0) 
+                {
+                	
+                	//setting the bits in the last byte of the bitfield
+                	bitField[bitField.length - 1] |= (1 << (8 - last));
+                	
+                    last--;
+                }
+                
+            }
+			
+		}
+		else
+		{
+			
+			Arrays.fill(bitField, (byte)0);
+			
+		}
+		
+		
+		//Connect to the peers that have already started
+		for(RemotePeerInfo pInfo : connectedPeers) 
+		{
+			
+			try 
+			{
+				
+				ClientThread client = new ClientThread(new Socket(pInfo.peerAddress, 
+						Integer.parseInt(pInfo.peerPort)), true, pInfo.peerId,cfg, bitField, fileData);
+				
+				client.start();
+				
+				ClientThreads.add(client);
+			} 
+			
+			catch(Exception ex) 
+			{
+				
+				ex.printStackTrace();
+				
+			}
+			
 		}
 
 		//Sockets listeners waiting for connection request from future peers in PeerInfo.cfg
-		try {
+		try 
+		{
+			
 			ServerSocket ss = new ServerSocket(peer.port);
-            for(RemotePeerInfo pInfo : futurePeers) {
-            	Socket socket = ss.accept();
-                if(socket != null) {
-                	ClientThread nc= new ClientThread(socket, false, "-1",cfg);
-                    nc.start();
-                    ClientThreads.add(nc);
+            
+			for(RemotePeerInfo pInfo : futurePeers) 
+			{
+            	
+				Socket socket = ss.accept();
+                
+				if(socket != null) 
+				{
+                	
+					ClientThread nc= new ClientThread(socket, false, pInfo.peerId, cfg, bitField, fileData);
+                    
+                	nc.start();
+                    
+                	ClientThreads.add(nc);
+                	
                 }
+				
             }
-        } catch (Exception ex) {
+			
+        } 
+		catch (Exception ex) 
+		{
+			
 			ex.printStackTrace();
-        }
+        
+		}
 
     }
 
