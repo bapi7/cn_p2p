@@ -7,11 +7,8 @@ import java.util.*;
 public class peerProcess {
 
 	public static List<ClientThread> ClientThreads = Collections.synchronizedList(new ArrayList<ClientThread>());
-
-	Integer port = 8000;
-	
+	Integer port = 8000;	
 	static Integer Id;
-
 	
 	public static void main(String[] args) throws Exception 
 	{
@@ -40,18 +37,16 @@ public class peerProcess {
 			
 			if(Integer.parseInt(rpi.peerId) < Integer.parseInt(args[0])) 
 			{
-				
 				connectedPeers.add(rpi);
-				
 			}
 			
 			else if(Integer.parseInt(rpi.peerId) == Integer.parseInt(args[0])) 
 			{
-				
 				peer.port = Integer.parseInt(rpi.peerPort);
-				
 				if(rpi.peerHasFile == "1")
+				{
 					has_file = 1;
+				}
 				
 			}
 			
@@ -61,7 +56,6 @@ public class peerProcess {
 				futurePeers.add(rpi);
 				
 			}
-
 		}
 
 		int size = cfg.noOfBytes;
@@ -75,10 +69,8 @@ public class peerProcess {
 			
 			try 
 			{
-				File file = new File("peer_"+ peerProcess.Id + "/" + cfg.FileName);
-			
-				FileInputStream fdata = new FileInputStream(file);
-			
+				File file = new File("peer_"+ peerProcess.Id + "/" + cfg.FileName);			
+				FileInputStream fdata = new FileInputStream(file);			
 				fdata.read(fileData);
 				fdata.close();
 			
@@ -90,25 +82,20 @@ public class peerProcess {
 			
 			if (pieces % 8 == 0) 
             {
-            
             	Arrays.fill(bitField, (byte) 255);
-                
             } 
+			
             else 
             {
                 int last = (int) pieces % 8;
-               
                 Arrays.fill(bitField, (byte) 255); 
-                
                 bitField[bitField.length - 1] = 0; 
-                
                 	                
                 while (last != 0) 
                 {
                 	
                 	//setting the bits in the last byte of the bitfield
                 	bitField[bitField.length - 1] |= (1 << (8 - last));
-                	
                     last--;
                 }
                 
@@ -117,16 +104,12 @@ public class peerProcess {
 		}
 		else
 		{
-			
 			Arrays.fill(bitField, (byte)0);
-			
 		}
-		
-		
+	
 		//Connect to the peers that have already started
 		for(RemotePeerInfo pInfo : connectedPeers) 
-		{
-			
+		{			
 			try 
 			{
 				
@@ -134,49 +117,36 @@ public class peerProcess {
 						Integer.parseInt(pInfo.peerPort)), true, pInfo.peerId,cfg, bitField, fileData);
 				
 				client.start();
-				
 				ClientThreads.add(client);
-			} 
-			
+			} 			
 			catch(Exception ex) 
 			{
-				
 				ex.printStackTrace();
-				
 			}
 			
 		}
 
 		//Sockets listeners waiting for connection request from future peers in PeerInfo.cfg
 		try 
-		{
-			
-			ServerSocket ss = new ServerSocket(peer.port);
-            
+		{			
+			ServerSocket ss = new ServerSocket(peer.port);			
 			for(RemotePeerInfo pInfo : futurePeers) 
 			{
-            	
-				Socket socket = ss.accept();
-                
+				Socket socket = ss.accept();			
 				if(socket != null) 
 				{
-                	
-					ClientThread nc= new ClientThread(socket, false, pInfo.peerId, cfg, bitField, fileData);
-                    
+					ClientThread nc= new ClientThread(socket, false, pInfo.peerId, cfg, 
+							bitField, fileData);
                 	nc.start();
-                    
-                	ClientThreads.add(nc);
-                	
+                	ClientThreads.add(nc);               	
                 }
 				
             }
 			
         } 
 		catch (Exception ex) 
-		{
-			
-			ex.printStackTrace();
-        
+		{			
+			ex.printStackTrace();       
 		}
 
     }
