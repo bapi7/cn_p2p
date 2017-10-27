@@ -3,6 +3,14 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
 
+
+/*
+ * This class contains functions that handle TCP messages
+ * like constructing different messages, sending messages
+ * to peers and receiving messages from peers
+*/
+
+
 public class TCPMsgUtil 
 {
 
@@ -34,6 +42,7 @@ public class TCPMsgUtil
 		
 	}
 	
+	//function to construct a handshake message
 	static byte[] constructHandshakeMessage(String peerID) 
 	{
 		String header = "P2PFILESHARINGPROJ";
@@ -48,6 +57,7 @@ public class TCPMsgUtil
 		
 	}
 	
+	//function to construct a message to be sent
 	static byte[] constructActualMessage(MessageType msgType, byte[] payload) 
 	{
 		Integer msgLength = payload.length + 1;
@@ -62,6 +72,7 @@ public class TCPMsgUtil
 		
 	}
 	
+	//function to receive a handshake message to a peer
 	public synchronized int receiveHandshakeMessage(InputStream in, int expectedPeerId)
 	{
 		
@@ -93,6 +104,7 @@ public class TCPMsgUtil
 		return pId;
 	}
 
+	//function to send an bit field message to a peer
 	public synchronized void sendBitFieldMessage(OutputStream out, byte[] bitField) 
 	{
 		
@@ -111,6 +123,7 @@ public class TCPMsgUtil
 		
 	}
 
+	//function to receive a bit field message to a peer
 	public synchronized byte[] receiveBitFieldMessage(InputStream in, int len) {
 		
 		byte[] msgLength, msgType;
@@ -140,6 +153,7 @@ public class TCPMsgUtil
 		
 	}
 	
+	//function to check if the peer is interested in any piece from the connected peer
 	public synchronized boolean isInterested(byte[] bitField, byte[] rcvBitField) {
 		
 		boolean isInt = false;		
@@ -161,6 +175,7 @@ public class TCPMsgUtil
 		return isInt;
 	}
 	
+	//function to send an interested message to a peer
 	public synchronized void sendInterestedMessage(OutputStream out) {
 		try {
 			//converting msg length to byte array
@@ -178,6 +193,7 @@ public class TCPMsgUtil
 		}
 	}
 	
+	//function to send an not interested message to a peer
 	public synchronized void sendNotInterestedMessage(OutputStream out) {
 		try {
 			//converting msg length to byte array
@@ -196,6 +212,7 @@ public class TCPMsgUtil
 		}
 	}
 	
+	//function to send a message to a peer
 	public synchronized void sendMessage(OutputStream out, byte[] msg) 
 	{
 		
@@ -212,6 +229,7 @@ public class TCPMsgUtil
 		
 	}
 	
+	//This function handles messages received in segments
 	public synchronized byte[] readCompleteMsg(InputStream input_stream, int len) 
     {
 		byte[] b = new byte[0];
