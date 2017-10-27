@@ -29,9 +29,7 @@ public class TCPMsgUtil
 		
 		MessageType(byte b) 
 		{
-			
 			this.val = b;
-			
 		}
 		
 	}
@@ -72,18 +70,15 @@ public class TCPMsgUtil
 		try 
 		{
             
-			byte[] rcv = new byte[32];
-            
-			in.read(rcv);
-			
-			byte[] header = Arrays.copyOfRange(rcv, 0, 18);
-			
+			byte[] rcv = new byte[32];         
+			in.read(rcv);			
+			byte[] header = Arrays.copyOfRange(rcv, 0, 18);			
 			byte[] pInd = Arrays.copyOfRange(rcv, 28, 32);
-
-            pId= Integer.parseInt(new String(pInd));
-            
+            pId= Integer.parseInt(new String(pInd));            
             if(header.toString() != "P2PFILESHARINGPROJ" || pId != expectedPeerId)
+            {
 				return -1;
+            }
             
             /*if(isClient)
                 if(peerHandShakeMap.containsKey(pId) && peerHandShakeMap.get(pId) == false)
@@ -92,9 +87,7 @@ public class TCPMsgUtil
 		
 		catch(IOException ioe) 
 		{
-        	
 			ioe.printStackTrace();
-        
 		}
 		
 		return pId;
@@ -107,15 +100,13 @@ public class TCPMsgUtil
 		{
             
             byte[] msg = TCPMsgUtil.constructActualMessage(TCPMsgUtil.MessageType.BITFIELD, bitField);
-            
             out.write(msg);
             out.flush();
         } 
+		
 		catch(IOException ioe) 
 		{
-        	
 			ioe.printStackTrace();
-			
         }
 		
 	}
@@ -129,50 +120,38 @@ public class TCPMsgUtil
 		{
 			
 			//4 bytes for message length and 1 byte for message type
-			msgLength = new byte[4];
-			
-			in.read(msgLength);
-			
-			msgType = new byte[1];
-			
+			msgLength = new byte[4];			
+			in.read(msgLength);			
+			msgType = new byte[1];			
 			in.read(msgType);
-            
 			rcv = new byte[len];
 			
 			if(msgType[0] == TCPMsgUtil.MessageType.BITFIELD.val) 
-			{
-				
-				in.read(rcv);
-				
+			{				
+				in.read(rcv);				
 			}
 
 		}
 		catch (IOException ioe) 
-		{
-			
-			ioe.printStackTrace();
-		
-		}
-		
+		{			
+			ioe.printStackTrace();		
+		}		
 		return rcv;
 		
 	}
 	
 	public synchronized boolean isInterested(byte[] bitField, byte[] rcvBitField) {
 		
-		boolean isInt = false;
-		
-		byte[] missing = new byte[bitField.length];
-		
-		int q;
-		
-		for(int i=0;i<bitField.length;i++) {
-			
-			missing[i] = (byte)(bitField[i] ^ rcvBitField[i]);
-			
+		boolean isInt = false;		
+		byte[] missing = new byte[bitField.length];		
+		int q;		
+		for(int i=0;i<bitField.length;i++) 
+		{			
+			missing[i] = (byte)(bitField[i] ^ rcvBitField[i]);		
 			q = (byte) (missing[i] & ~bitField[i]);
 			
-			if(q!=0) {
+			if(q!=0) 
+			{
 				isInt = true;
 				break;
 			}
@@ -192,7 +171,9 @@ public class TCPMsgUtil
 			 
 			out.write(res);
 			out.flush();
-		} catch(IOException ioe) {
+		} 
+		catch(IOException ioe) 
+		{
 			ioe.printStackTrace();
 		}
 	}
@@ -208,7 +189,9 @@ public class TCPMsgUtil
 			out.write(res);
 			out.flush();
 			
-		} catch(IOException ioe) {
+		} 
+		catch(IOException ioe) 
+		{
 			ioe.printStackTrace();
 		}
 	}
@@ -218,17 +201,13 @@ public class TCPMsgUtil
 		
 		try 
 		{
-			
 			//stream write the message
 			out.write(msg);
 			out.flush();
-		
 		}
 		catch(IOException ioException)
 		{
-			
 			ioException.printStackTrace();
-			
 		}
 		
 	}
@@ -241,23 +220,17 @@ public class TCPMsgUtil
         
 		try 
 		{
-			
 			while(rem != 0) 
 			{
-            
-				int avail = input_stream.available();
-            
-				int read = (len <= avail) ? len : avail;
-            
+				int avail = input_stream.available();          
+				int read = (len <= avail) ? len : avail;           
 				byte[] r = new byte[read];
             
 				if(read != 0)
 				{
 					
-					input_stream.read(r);
-                
-					b = ClientHelper.appendByteArray(b, r);
-                
+					input_stream.read(r);               
+					b = ClientHelper.appendByteArray(b, r);                
 					rem -= read;
 					
 				}
