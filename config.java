@@ -66,57 +66,45 @@ public class config {
 			}
 
 			if(FileSize%PieceSize == 0 )
-			{
-				
+			{	
 				noOfPieces = FileSize/PieceSize;
-			
 			}
+			
 			else
 			{
-			
 				noOfPieces = (FileSize/PieceSize)+1;
-			
 			}
 
 			if(noOfPieces%8 == 0)
-			{
-				
+			{	
 				noOfBytes = noOfPieces/8;
-			
 			}
+			
 			else
 			{
-				
 				noOfBytes = (noOfPieces/8)+1;
-			
 			}
 
 			in.close();
-			
 			in = new BufferedReader(new FileReader("PeerInfo.cfg"));
 			
 			while((str = in.readLine()) != null) 
 			{
 				
 				String[] tokens = str.split("\\s+");
-		    	
 				peerInfoVector.addElement(new RemotePeerInfo(tokens[0], tokens[1], tokens[2],tokens[3]));
 			
 			}
-
-
+			
 			in.close();
-		
 		}
 		
 		catch (Exception ex) 
 		{
 			
-			System.out.println(ex.toString());
-		
+			System.out.println(ex.toString());		
 		}
 
 	}
 
-	
 }
