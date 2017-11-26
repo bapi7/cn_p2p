@@ -1,7 +1,5 @@
 import java.net.*;
 import java.io.*;
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
@@ -21,7 +19,11 @@ public class ClientThread extends Thread
 	Runnable intThread;
 	TCPMsgUtil util;
 	byte[] fileData;
+	boolean clientInterested;
+	Float downloadRate;
+	boolean choked;
 	List<Integer> preferredNeighbors = new ArrayList<Integer>();
+	boolean stoppingCondition = false;
 
 	public ClientThread(Socket s, boolean isClient, String peerID, config cfg, byte[] bitField, byte[] fileData) 
 	{
@@ -83,11 +85,39 @@ public class ClientThread extends Thread
 	{		
 		try 
 		{
-			BufferedInputStream inp_stream = new BufferedInputStream(requestSocket.getInputStream());
-			
-		    //while(1) 
-			//{
-		    //	if(cfg.NumberOfPreferredNeighbors)
+			byte[] msgLength, msgType;
+			msgType = new byte[1];
+			msgLength = new byte[4];
+		    while(!stoppingCondition) 
+			{
+		    	in.read(msgLength);
+		    	in.read(msgType);
+		    	switch(new String(msgType)) {
+		    		case "CHOKE":
+		    			break;
+		    			
+		    		case "UNCHOKE": 
+		    			break;
+		    			
+		    		case "INTERESTED":
+		    			break;
+		    			
+		    		case "NOTINTERESTED": 
+		    			break;
+		    			
+		    		case "HAVE":
+		    			break;
+		    			
+		    		case "REQUEST": 
+		    			break;
+		    			
+		    		case "PIECE":
+		    			break;
+		    			
+		    		default:
+		    			break;
+		    	}
+		    	//if(cfg.NumberOfPreferredNeighbors)
 				//sendMessage(message);
 			
 				//Receive the upperCase sentence from the server
@@ -98,7 +128,7 @@ public class ClientThread extends Thread
 			    // if any messages are 
 				//System.out.println("Receive message: " + MESSAGE);
 			
-			//}
+			}
 		} 
 		
 		catch(IOException ioException)
@@ -121,4 +151,69 @@ public class ClientThread extends Thread
 			}
 		}
 	}
+	
+	//Method to send Unchoke message
+	public void sendUnchokeMessage() {
+		try {
+			//converting msg length to byte array
+			byte[] len = ClientHelper.int_to_bytearray(1);
+			
+			//appending message type to msg length, no payload for unchoke message
+			byte[] res = ClientHelper.append_byte_to_bytearray(len, TCPMsgUtil.MessageType.UNCHOKE.val);
+			 
+			out.write(res);
+			out.flush();
+		} 
+		catch(IOException ioe) 
+		{
+			ioe.printStackTrace();
+		}
+	}
+	
+	//Method to send choke message
+	public void sendChokeMessage() {
+		try {
+			//converting msg length to byte array
+			byte[] len = ClientHelper.int_to_bytearray(1);
+			
+			//appending message type to msg length, no payload for choke message
+			byte[] res = ClientHelper.append_byte_to_bytearray(len, TCPMsgUtil.MessageType.CHOKE.val);
+			 
+			out.write(res);
+			out.flush();
+		} 
+		catch(IOException ioe) 
+		{
+			ioe.printStackTrace();
+		}
+	}
+	
+    //Update the stopping condition to true when the method is called. This results in closing the socket connection
+    public void closeClientThread(boolean end) 
+    {
+        
+    	stoppingCondition = end;
+        
+    	if(end == true)
+    	{
+        
+    		try
+    		{
+                if(!requestSocket.isClosed()) {
+                	if(!requestSocket.isInputShutdown())
+                		in.close();
+                	if(!requestSocket.isOutputShutdown())
+                		out.close();
+    				requestSocket.close();
+                }
+            }
+    		
+    		catch (IOException e) 
+    		{    
+               System.out.println(e.getMessage());
+    		}
+        		
+    	}
+            
+    }
 }

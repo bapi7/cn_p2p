@@ -42,7 +42,7 @@ public class TCPMsgUtil
 		
 	}
 	
-	//function to construct a handshake message
+	//Method to construct a handshake message
 	static byte[] constructHandshakeMessage(String peerID) 
 	{
 		String header = "P2PFILESHARINGPROJ";
@@ -57,7 +57,7 @@ public class TCPMsgUtil
 		
 	}
 	
-	//function to construct a message to be sent
+	//Method to construct a message to be sent
 	static byte[] constructActualMessage(MessageType msgType, byte[] payload) 
 	{
 		Integer msgLength = payload.length + 1;
@@ -72,7 +72,7 @@ public class TCPMsgUtil
 		
 	}
 	
-	//function to receive a handshake message to a peer
+	//Method to receive a handshake message to a peer
 	public synchronized int receiveHandshakeMessage(InputStream in, int expectedPeerId)
 	{
 		
@@ -104,13 +104,12 @@ public class TCPMsgUtil
 		return pId;
 	}
 
-	//function to send an bit field message to a peer
+	//Method to send an bit field message to a peer
 	public synchronized void sendBitFieldMessage(OutputStream out, byte[] bitField) 
 	{
 		
 		try 
 		{
-            
             byte[] msg = TCPMsgUtil.constructActualMessage(TCPMsgUtil.MessageType.BITFIELD, bitField);
             out.write(msg);
             out.flush();
@@ -123,7 +122,7 @@ public class TCPMsgUtil
 		
 	}
 
-	//function to receive a bit field message to a peer
+	//Method to receive a bit field message to a peer
 	public synchronized byte[] receiveBitFieldMessage(InputStream in, int len) {
 		
 		byte[] msgLength, msgType;
@@ -153,7 +152,7 @@ public class TCPMsgUtil
 		
 	}
 	
-	//function to check if the peer is interested in any piece from the connected peer
+	//Method to check if the peer is interested in any piece from the connected peer
 	public synchronized boolean isInterested(byte[] bitField, byte[] rcvBitField) {
 		
 		boolean isInt = false;		
@@ -175,11 +174,11 @@ public class TCPMsgUtil
 		return isInt;
 	}
 	
-	//function to send an interested message to a peer
+	//Method to send an interested message to a peer
 	public synchronized void sendInterestedMessage(OutputStream out) {
 		try {
 			//converting msg length to byte array
-			byte[] len = ClientHelper.int_to_bytearray(5);
+			byte[] len = ClientHelper.int_to_bytearray(1);
 			
 			//appending message type to msg length, no payload for interested message
 			byte[] res = ClientHelper.append_byte_to_bytearray(len, MessageType.INTERESTED.val);
@@ -193,11 +192,11 @@ public class TCPMsgUtil
 		}
 	}
 	
-	//function to send an not interested message to a peer
+	//Method to send an not interested message to a peer
 	public synchronized void sendNotInterestedMessage(OutputStream out) {
 		try {
 			//converting msg length to byte array
-			byte[] len = ClientHelper.int_to_bytearray(5);
+			byte[] len = ClientHelper.int_to_bytearray(1);
 			
 			//appending message type to msg length, no payload for not interested message
 			byte[] res = ClientHelper.append_byte_to_bytearray(len, MessageType.NOTINTERESTED.val);
@@ -212,7 +211,7 @@ public class TCPMsgUtil
 		}
 	}
 	
-	//function to send a message to a peer
+	//Method to send a message to a peer
 	public synchronized void sendMessage(OutputStream out, byte[] msg) 
 	{
 		
@@ -229,7 +228,7 @@ public class TCPMsgUtil
 		
 	}
 	
-	//This function handles messages received in segments
+	//This method handles messages received in segments
 	public synchronized byte[] readCompleteMsg(InputStream input_stream, int len) 
     {
 		byte[] b = new byte[0];
