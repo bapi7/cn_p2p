@@ -2,6 +2,8 @@ import java.net.*;
 import java.io.*;
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Vector;
 
 
@@ -16,9 +18,10 @@ public class ClientThread extends Thread
 	String peerID;
 	byte[] bitField;
 	config cfg;
-	Thread intThread;
+	Runnable intThread;
 	TCPMsgUtil util;
 	byte[] fileData;
+	List<Integer> preferredNeighbors = new ArrayList<Integer>();
 
 	public ClientThread(Socket s, boolean isClient, String peerID, config cfg, byte[] bitField, byte[] fileData) 
 	{
@@ -54,29 +57,20 @@ public class ClientThread extends Thread
 	        	util.sendMessage(out, TCPMsgUtil.constructHandshakeMessage(peerID));
 	        	
 	        }
-	        //Thread to handle bit field and interested/not interested messages
-	        intThread = new Thread() 
-	        {
-	            	
-	        	public void run() 
-	        	{	                
-	        		util.sendBitFieldMessage(out, bitField);	                
-	        		byte[] rcv = util.receiveBitFieldMessage(in, cfg.noOfBytes);
-
-	                if(util.isInterested(bitField, rcv))
-	                {
-	                    util.sendInterestedMessage(out);
-	                }
-	                else 
-	                { 
-	                   util.sendNotInterestedMessage(out);
-	                }
-	                
-	        		notify();
-	            }
-	        };
 	        
-	        intThread.start();
+	        util.sendBitFieldMessage(out, bitField);	                
+	        
+	        byte[] rcv = util.receiveBitFieldMessage(in, cfg.noOfBytes);
+
+	        if(util.isInterested(bitField, rcv))
+	        {
+	        	util.sendInterestedMessage(out);
+	        }
+	        else 
+	        { 
+	            util.sendNotInterestedMessage(out);
+	        }
+	        
 		} 		
 		catch(IOException ioe) 
 		{			
@@ -91,9 +85,9 @@ public class ClientThread extends Thread
 		{
 			BufferedInputStream inp_stream = new BufferedInputStream(requestSocket.getInputStream());
 			
-		    //while(!stoppingCondition) 
-			 //{
-
+		    //while(1) 
+			//{
+		    //	if(cfg.NumberOfPreferredNeighbors)
 				//sendMessage(message);
 			
 				//Receive the upperCase sentence from the server

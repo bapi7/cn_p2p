@@ -3,11 +3,19 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.net.*;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class peerProcess {
 
-	public static List<ClientThread> ClientThreads = Collections.synchronizedList(new ArrayList<ClientThread>());
-	Integer port = 8000;	
+	static List<ClientThread> ClientThreads = Collections.synchronizedList(new ArrayList<ClientThread>());
+	static List<Integer> preferredNeighbors = new ArrayList<Integer>();
+	ScheduledExecutorService scheduler =
+		     Executors.newScheduledThreadPool(3);
+	Integer port = 8000;
 	static Integer Id;
 	
 	public static void main(String[] args) throws Exception 
@@ -125,7 +133,12 @@ public class peerProcess {
 			}
 			
 		}
-
+		
+		if(connectedPeers.size() > cfg.NumberOfPreferredNeighbors)
+			connectedPeers = connectedPeers.subList(0, cfg.NumberOfPreferredNeighbors);
+		
+		preferredNeighbors = connectedPeers.stream().map(cp -> Integer.parseInt(cp.peerId)).collect(Collectors.toList());	
+		
 		//Sockets listeners waiting for connection request from future peers in PeerInfo.cfg
 		try 
 		{			
@@ -148,8 +161,22 @@ public class peerProcess {
 		{			
 			ex.printStackTrace();       
 		}
+		
+		peer.updatePreferredNeighbors(cfg.UnchokingInterval);
 
     }
+	
+	public void updatePreferredNeighbors(int p) {
+		
+		Runnable managepc = () -> {
+			for(Integer curr: preferredNeighbors) {
+				ClientThreads.stream().filter(c -> (Integer.parseInt(c.peerID)==curr)).collect(Collectors.toList());
+			}
+			//preferredNeighbors.stream().map(c -> ClientThreads.)
+		};
+		//final ScheduledFuture<?> peerCon =
+		scheduler.scheduleAtFixedRate(managepc, p, p, TimeUnit.SECONDS);
+	}
 
 }
 

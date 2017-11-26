@@ -2,3 +2,5 @@
 .project
 .classpath
 *.log
+peer_*/
+*.txt
