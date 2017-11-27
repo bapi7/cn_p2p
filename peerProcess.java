@@ -5,7 +5,6 @@ import java.net.*;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -179,19 +178,12 @@ public class peerProcess {
 		peer.monitorFileSharingStatus();
     }
 	
-	public class RateComparator implements Comparator<ClientThread> {
-	    @Override
-	    public int compare(ClientThread ct1, ClientThread ct2) {
-	        return ct1.downloadRate.compareTo(ct2.downloadRate);
-	    }
-	}
-	
 	public void updatePreferredNeighbors(int k, int p) {
 		
 		Runnable updatepn = () -> {
 			
 			//Order the peers by download rate
-			Collections.sort(ClientThreads, new RateComparator());
+			Collections.sort(ClientThreads, (ct1, ct2) -> ct2.downloadRate.compareTo(ct1.downloadRate));
 			
 			int neighbors = 0;
 			
@@ -220,7 +212,6 @@ public class peerProcess {
 			}
 			
 		};
-		//final ScheduledFuture<?> peerCon =
 		scheduler.scheduleAtFixedRate(updatepn, p, p, TimeUnit.SECONDS);
 	}
 	

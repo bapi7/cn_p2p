@@ -2,7 +2,6 @@ import java.net.*;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Vector;
 
 
 public class ClientThread extends Thread
@@ -15,12 +14,14 @@ public class ClientThread extends Thread
 	boolean isClient;
 	String peerID;
 	byte[] bitField;
+	byte[] peerBitField;
 	config cfg;
 	Runnable intThread;
 	TCPMsgUtil util;
 	byte[] fileData;
 	boolean clientInterested;
 	Float downloadRate;
+	Long avgPieceDownloadTime;
 	boolean choked;
 	List<Integer> preferredNeighbors = new ArrayList<Integer>();
 	boolean stoppingCondition = false;
@@ -62,9 +63,9 @@ public class ClientThread extends Thread
 	        
 	        util.sendBitFieldMessage(out, bitField);	                
 	        
-	        byte[] rcv = util.receiveBitFieldMessage(in, cfg.noOfBytes);
+	        peerBitField = util.receiveBitFieldMessage(in, cfg.noOfBytes);
 
-	        if(util.isInterested(bitField, rcv))
+	        if(util.isInterested(bitField, peerBitField))
 	        {
 	        	util.sendInterestedMessage(out);
 	        }
@@ -85,6 +86,8 @@ public class ClientThread extends Thread
 	{		
 		try 
 		{
+			long req_time, total_time;
+			int piecesRcvd = 0;
 			byte[] msgLength, msgType;
 			msgType = new byte[1];
 			msgLength = new byte[4];
@@ -106,9 +109,25 @@ public class ClientThread extends Thread
 		    			break;
 		    			
 		    		case "HAVE":
+		    			//Have message contains 4 byte piece index payload
+		    			byte[] pieceIndexbytes = util.readCompleteMsg(in, 4);
+		    			int pieceIndex = ClientHelper.bytearray_to_int(pieceIndexbytes);
+		    			
+		    			byte indexByte = bitField[pieceIndex/8];
+		    			//Checking if it has the piece, if not send interested message
+		    			if(((1 << (pieceIndex%8)) & indexByte) == 0) {
+		    				util.sendInterestedMessage(out);
+		    				peerBitField[pieceIndex/8] |=  (1 << (pieceIndex%8));
+		    			}
+		    			
+		    			else 
+		    	        { 
+		    	            util.sendNotInterestedMessage(out);
+		    	        }
 		    			break;
 		    			
 		    		case "REQUEST": 
+		    			
 		    			break;
 		    			
 		    		case "PIECE":
@@ -117,16 +136,6 @@ public class ClientThread extends Thread
 		    		default:
 		    			break;
 		    	}
-		    	//if(cfg.NumberOfPreferredNeighbors)
-				//sendMessage(message);
-			
-				//Receive the upperCase sentence from the server
-			
-				//MESSAGE = (String)in.readObject();
-			
-				//show the message to the user
-			    // if any messages are 
-				//System.out.println("Receive message: " + MESSAGE);
 			
 			}
 		} 

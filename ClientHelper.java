@@ -44,4 +44,19 @@ public class ClientHelper
 		
 	}
 	
+	static int bytearray_to_int(byte[] by) 
+	{
+		
+		int conv0 = ((by[0] & 0xFF) << 24);
+		
+		int conv1 = ((by[1] & 0xFF) << 16);
+		
+		int conv2 = ((by[2] & 0xFF) << 8);
+		
+		int conv3 = (by[3] & 0xFF);
+		
+		return conv0 | conv1 | conv2 | conv3;
+		
+	}
+	
 }
