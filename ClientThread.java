@@ -1,6 +1,7 @@
 import java.net.*;
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 
@@ -13,7 +14,6 @@ public class ClientThread extends Thread
 	
 	boolean isClient;
 	String peerID;
-	byte[] bitField;
 	byte[] peerBitField;
 	config cfg;
 	Runnable intThread;
@@ -26,7 +26,7 @@ public class ClientThread extends Thread
 	List<Integer> preferredNeighbors = new ArrayList<Integer>();
 	boolean stoppingCondition = false;
 
-	public ClientThread(Socket s, boolean isClient, String peerID, config cfg, byte[] bitField, byte[] fileData) 
+	public ClientThread(Socket s, boolean isClient, String peerID, config cfg, byte[] fileData) 
 	{
 		
 		this.cfg = cfg;
@@ -37,7 +37,6 @@ public class ClientThread extends Thread
 		try
 		{
 			
-			this.bitField = bitField;
 			this.fileData = fileData;
 			
 			//initialize inputStream and outputStream
@@ -61,18 +60,24 @@ public class ClientThread extends Thread
 	        	
 	        }
 	        
-	        util.sendBitFieldMessage(out, bitField);	                
-	        
-	        peerBitField = util.receiveBitFieldMessage(in, cfg.noOfBytes);
+	        peerProcess.lock.lock();
+	        try{
+	        	util.sendBitFieldMessage(out, peerProcess.bitField);	                
+		        
+		        peerBitField = util.receiveBitFieldMessage(in, cfg.noOfBytes);
 
-	        if(util.isInterested(bitField, peerBitField))
-	        {
-	        	util.sendInterestedMessage(out);
+		        if(util.isInterested(peerProcess.bitField, peerBitField))
+		        {
+		        	util.sendInterestedMessage(out);
+		        }
+		        else 
+		        { 
+		            util.sendNotInterestedMessage(out);
+		        }
+	        } finally {
+	        	peerProcess.lock.unlock();
 	        }
-	        else 
-	        { 
-	            util.sendNotInterestedMessage(out);
-	        }
+	        
 	        
 		} 		
 		catch(IOException ioe) 
@@ -86,26 +91,50 @@ public class ClientThread extends Thread
 	{		
 		try 
 		{
-			long req_time, total_time;
+			long req_time = 0l, total_time = 0l;
 			int piecesRcvd = 0;
-			byte[] msgLength, msgType;
+			byte[] msgLength, msgType, payload;
 			msgType = new byte[1];
 			msgLength = new byte[4];
+			int requestedIndex = 0;
 		    while(!stoppingCondition) 
 			{
 		    	in.read(msgLength);
 		    	in.read(msgType);
 		    	switch(new String(msgType)) {
 		    		case "CHOKE":
+		    			byte indByte = peerProcess.bitField[requestedIndex/8];
+		    			
+		    			if(((1 << (7 - (requestedIndex%8))) & indByte) == 0) {
+		    				peerProcess.requested[requestedIndex].set(false);
+		    			}
+		    			
 		    			break;
 		    			
-		    		case "UNCHOKE": 
+		    		case "UNCHOKE":
+		    			//Fetch the piece index to request
+		    			int pIndex = util.getPieceIndexToRequest(peerProcess.bitField, peerBitField, peerProcess.requested);
+		    			
+		    			if(pIndex>=0) {
+		    				requestedIndex = pIndex;
+		    				peerProcess.requested[pIndex].set(true);
+		    				util.sendRequestMessage(out, pIndex);
+		    				req_time = System.currentTimeMillis();
+		    			} else {
+		    				util.sendNotInterestedMessage(out);
+		    			}
+		    			
 		    			break;
 		    			
 		    		case "INTERESTED":
+		    			if(!clientInterested)
+		    				clientInterested = true;
 		    			break;
 		    			
 		    		case "NOTINTERESTED": 
+		    			clientInterested = false;
+		    			choked = true;
+		    			//sendChokeMessage();
 		    			break;
 		    			
 		    		case "HAVE":
@@ -113,11 +142,11 @@ public class ClientThread extends Thread
 		    			byte[] pieceIndexbytes = util.readCompleteMsg(in, 4);
 		    			int pieceIndex = ClientHelper.bytearray_to_int(pieceIndexbytes);
 		    			
-		    			byte indexByte = bitField[pieceIndex/8];
+		    			byte indexByte = peerProcess.bitField[pieceIndex/8];
 		    			//Checking if it has the piece, if not send interested message
-		    			if(((1 << (pieceIndex%8)) & indexByte) == 0) {
+		    			if(((1 << (7 - (pieceIndex%8))) & indexByte) == 0) {
 		    				util.sendInterestedMessage(out);
-		    				peerBitField[pieceIndex/8] |=  (1 << (pieceIndex%8));
+		    				peerBitField[pieceIndex/8] |=  (1 << (7 - (pieceIndex%8)));
 		    			}
 		    			
 		    			else 
@@ -126,11 +155,41 @@ public class ClientThread extends Thread
 		    	        }
 		    			break;
 		    			
-		    		case "REQUEST": 
+		    		case "REQUEST":
+		    			payload = new byte[4];
+		    			in.read(payload);
+		    			int pieceInd = ClientHelper.bytearray_to_int(payload);
 		    			
+		    			int startInd = pieceInd*cfg.PieceSize;
+		    			
+		    			byte[] data;
+		    			if((cfg.FileSize-startInd) < cfg.PieceSize) {
+		    				data = Arrays.copyOfRange(peerProcess.fileData, startInd, cfg.FileSize);
+		    			} 
+		    			
+		    			else {
+		    				data = Arrays.copyOfRange(peerProcess.fileData, startInd, startInd+cfg.PieceSize);
+		    			}
+		    			 
+		    			if(!choked)
+		    				util.sendPieceMessage(out, pieceInd, data);
 		    			break;
 		    			
 		    		case "PIECE":
+		    			byte[] pInd = new byte[4];
+		    			in.read(pInd);
+		    			
+		    			int pcInd = ClientHelper.bytearray_to_int(pInd);
+		    			
+		    			byte[] pdata = util.readCompleteMsg(in, cfg.PieceSize);
+		    			
+		    			peerProcess.bitField[pcInd/8] |= 1 << (7-(pcInd%8));
+		    			
+		    			piecesRcvd++;
+		    			total_time += (System.currentTimeMillis() - req_time)/1000;
+		    			downloadRate = (float) ((piecesRcvd*cfg.PieceSize)/total_time);
+		    			
+		    			
 		    			break;
 		    			
 		    		default:

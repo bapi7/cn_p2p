@@ -7,14 +7,20 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 public class peerProcess {
 
 	static List<ClientThread> ClientThreads = Collections.synchronizedList(new ArrayList<ClientThread>());
 	static ClientThread optUnchokedNeighbor;
+	static byte[] bitField, fileData;
+	static AtomicBoolean[] requested;
 	ScheduledExecutorService scheduler =
 		     Executors.newScheduledThreadPool(3);
+	
+	final static ReentrantLock lock = new ReentrantLock();
 	Integer port = 8000;
 	static Integer Id;
 	
@@ -69,8 +75,14 @@ public class peerProcess {
 		int size = cfg.noOfBytes;
 		int pieces = cfg.noOfPieces;
 		
-		byte[] bitField = new byte[size];
-		byte[] fileData = new byte[cfg.FileSize];
+		bitField = new byte[size];
+		
+		//Array to monitor if a piece has been already requested
+		requested = new AtomicBoolean[pieces];
+		Arrays.fill(requested, false);
+		
+		
+		fileData = new byte[cfg.FileSize];
 		//Check if the peer has the file and then set the all the bits to 1 if it has the file and 0 if doesn't
 		if(has_file == 1)
 		{
@@ -122,7 +134,7 @@ public class peerProcess {
 			{
 				
 				ClientThread client = new ClientThread(new Socket(pInfo.peerAddress, 
-						Integer.parseInt(pInfo.peerPort)), true, pInfo.peerId,cfg, bitField, fileData);
+						Integer.parseInt(pInfo.peerPort)), true, pInfo.peerId,cfg, fileData);
 				
 				client.start();
 				ClientThreads.add(client);
@@ -159,7 +171,7 @@ public class peerProcess {
 				if(socket != null) 
 				{
 					ClientThread nc= new ClientThread(socket, false, pInfo.peerId, cfg, 
-							bitField, fileData);
+							fileData);
                 	nc.start();
                 	ClientThreads.add(nc);               	
                 }

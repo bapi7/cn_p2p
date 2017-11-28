@@ -1,7 +1,11 @@
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 /*
@@ -42,6 +46,8 @@ public class TCPMsgUtil
 		
 	}
 	
+	byte[] want;
+	
 	//Method to construct a handshake message
 	static byte[] constructHandshakeMessage(String peerID) 
 	{
@@ -73,7 +79,7 @@ public class TCPMsgUtil
 	}
 	
 	//Method to receive a handshake message to a peer
-	public synchronized int receiveHandshakeMessage(InputStream in, int expectedPeerId)
+	public int receiveHandshakeMessage(InputStream in, int expectedPeerId)
 	{
 		
 		Integer pId = -1;
@@ -105,20 +111,11 @@ public class TCPMsgUtil
 	}
 
 	//Method to send an bit field message to a peer
-	public synchronized void sendBitFieldMessage(OutputStream out, byte[] bitField) 
+	public void sendBitFieldMessage(OutputStream out, byte[] bitField) 
 	{
 		
-		try 
-		{
-            byte[] msg = TCPMsgUtil.constructActualMessage(TCPMsgUtil.MessageType.BITFIELD, bitField);
-            out.write(msg);
-            out.flush();
-        } 
-		
-		catch(IOException ioe) 
-		{
-			ioe.printStackTrace();
-        }
+        byte[] msg = constructActualMessage(MessageType.BITFIELD, bitField);
+        sendMessage(out, msg);
 		
 	}
 
@@ -138,7 +135,7 @@ public class TCPMsgUtil
 			in.read(msgType);
 			rcv = new byte[len];
 			
-			if(msgType[0] == TCPMsgUtil.MessageType.BITFIELD.val) 
+			if(msgType[0] == MessageType.BITFIELD.val) 
 			{				
 				in.read(rcv);				
 			}
@@ -152,22 +149,58 @@ public class TCPMsgUtil
 		
 	}
 	
+	//Method to fetch the next piece index to request
+	public int getPieceIndexToRequest(byte[] bitField, byte[] rcvBitField, AtomicBoolean[] reqBitField) {
+		byte[] req = new byte[bitField.length];
+		Arrays.fill(req, (byte)0);
+		//convert reqBitField to byte array
+		byte[] reqBitFieldByte = ClientHelper.atomicbooleanarray_to_bytearray(reqBitField, req);
+		int pieceIndex = 0;
+		byte[] reqAndCurr = new byte[bitField.length];
+		List<Integer> nonEmpty = new ArrayList<Integer>();
+		
+		for(int i=0;i<bitField.length;i++) 
+		{
+			reqAndCurr[i] = (byte)(bitField[i] | reqBitFieldByte[i]);
+			want[i] = (byte)((reqAndCurr[i] ^ rcvBitField[i]) & ~reqAndCurr[i]);
+			
+			if(want[i]!=0)
+				nonEmpty.add(i);
+		}
+		
+		if(nonEmpty.isEmpty())
+			return -1;
+		
+		int byteInd = nonEmpty.get(ThreadLocalRandom.current().nextInt(0, nonEmpty.size()));
+		byte rand = want[byteInd];
+		
+		int bitInd = ThreadLocalRandom.current().nextInt(0, 8);
+		for(int i=0;i<8;i++) {
+			if((rand & (1 << i)) !=0) {
+				bitInd = i;
+				break;
+			}
+		}
+		
+		pieceIndex = (byteInd*8) + (7-bitInd);
+				
+		return pieceIndex;
+	}
+		
+		
 	//Method to check if the peer is interested in any piece from the connected peer
-	public synchronized boolean isInterested(byte[] bitField, byte[] rcvBitField) {
+	public boolean isInterested(byte[] bitField, byte[] rcvBitField) {
 		
 		boolean isInt = false;		
 		byte[] missing = new byte[bitField.length];		
-		int q;		
+				
 		for(int i=0;i<bitField.length;i++) 
 		{			
 			missing[i] = (byte)(bitField[i] ^ rcvBitField[i]);		
-			q = (byte) (missing[i] & ~bitField[i]);
+			want[i] = (byte) (missing[i] & ~bitField[i]);
 			
-			if(q!=0) 
-			{
+			if(want[i]!=0)
 				isInt = true;
-				break;
-			}
 				
 		}
 		
@@ -175,47 +208,54 @@ public class TCPMsgUtil
 	}
 	
 	//Method to send an interested message to a peer
-	public synchronized void sendInterestedMessage(OutputStream out) {
-		try {
-			//converting msg length to byte array
-			byte[] len = ClientHelper.int_to_bytearray(1);
+	public void sendInterestedMessage(OutputStream out) {
+		
+		//converting msg length to byte array
+		byte[] len = ClientHelper.int_to_bytearray(1);
 			
-			//appending message type to msg length, no payload for interested message
-			byte[] res = ClientHelper.append_byte_to_bytearray(len, MessageType.INTERESTED.val);
+		//appending message type to msg length, no payload for interested message
+		byte[] res = ClientHelper.append_byte_to_bytearray(len, MessageType.INTERESTED.val);
 			 
-			out.write(res);
-			out.flush();
-		} 
-		catch(IOException ioe) 
-		{
-			ioe.printStackTrace();
-		}
+		sendMessage(out, res);
+		
 	}
 	
 	//Method to send an not interested message to a peer
-	public synchronized void sendNotInterestedMessage(OutputStream out) {
-		try {
-			//converting msg length to byte array
-			byte[] len = ClientHelper.int_to_bytearray(1);
+	public void sendNotInterestedMessage(OutputStream out) {
+		
+		//converting msg length to byte array
+		byte[] len = ClientHelper.int_to_bytearray(1);
 			
-			//appending message type to msg length, no payload for not interested message
-			byte[] res = ClientHelper.append_byte_to_bytearray(len, MessageType.NOTINTERESTED.val);
+		//appending message type to msg length, no payload for not interested message
+		byte[] res = ClientHelper.append_byte_to_bytearray(len, MessageType.NOTINTERESTED.val);
 			
-			out.write(res);
-			out.flush();
+		sendMessage(out, res);
+		
+	}
+	
+	//Method to send request message
+	public void sendRequestMessage(OutputStream out, int pieceIndex) {
+		
+		byte[] msg = constructActualMessage(MessageType.REQUEST, ClientHelper.int_to_bytearray(pieceIndex));
 			
-		} 
-		catch(IOException ioe) 
-		{
-			ioe.printStackTrace();
-		}
+		sendMessage(out, msg);
+			
+	}
+	
+	//Method to send the piece message
+	public void sendPieceMessage(OutputStream out, int pieceIndex, byte[] data) {
+		
+		byte[] msg = constructActualMessage(MessageType.PIECE, ClientHelper.appendByteArray(ClientHelper.int_to_bytearray(pieceIndex), data));
+		
+		sendMessage(out, msg);
+		
 	}
 	
 	//Method to send a message to a peer
-	public synchronized void sendMessage(OutputStream out, byte[] msg) 
+	public void sendMessage(OutputStream out, byte[] msg) 
 	{
 		
-		try 
+		try
 		{
 			//stream write the message
 			out.write(msg);
@@ -229,7 +269,7 @@ public class TCPMsgUtil
 	}
 	
 	//This method handles messages received in segments
-	public synchronized byte[] readCompleteMsg(InputStream input_stream, int len) 
+	public byte[] readCompleteMsg(InputStream input_stream, int len) 
     {
 		byte[] b = new byte[0];
 		

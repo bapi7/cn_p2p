@@ -1,3 +1,5 @@
+import java.util.concurrent.atomic.AtomicBoolean;
+
 public class ClientHelper 
 {
 
@@ -57,6 +59,17 @@ public class ClientHelper
 		
 		return conv0 | conv1 | conv2 | conv3;
 		
+	}
+	
+	static byte[] atomicbooleanarray_to_bytearray(AtomicBoolean[] ab, byte[] res) {
+		
+		for(int ind=0;ind<ab.length;ind++) {
+			if(ab[ind].get()) {
+				res[ind/8] |= 1 << (7-(ind%8));
+			}
+		}
+		
+		return res;
 	}
 	
 }
