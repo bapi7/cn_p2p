@@ -15,7 +15,7 @@ public class peerProcess {
 
 	static List<ClientThread> ClientThreads = Collections.synchronizedList(new ArrayList<ClientThread>());
 	static ClientThread optUnchokedNeighbor;
-	static byte[] bitField, fileData;
+	static byte[] bitField, fileData, completeFile;
 	static AtomicBoolean[] requested;
 	ScheduledExecutorService scheduler =
 		     Executors.newScheduledThreadPool(3);
@@ -83,6 +83,8 @@ public class peerProcess {
 		
 		
 		fileData = new byte[cfg.FileSize];
+		completeFile = new byte[size];
+		
 		//Check if the peer has the file and then set the all the bits to 1 if it has the file and 0 if doesn't
 		if(has_file == 1)
 		{
@@ -103,19 +105,23 @@ public class peerProcess {
 			if (pieces % 8 == 0) 
             {
             	Arrays.fill(bitField, (byte) 255);
+            	Arrays.fill(completeFile, (byte)255);
             } 
 			
             else 
             {
                 int last = (int) pieces % 8;
-                Arrays.fill(bitField, (byte) 255); 
-                bitField[bitField.length - 1] = 0; 
+                Arrays.fill(bitField, (byte) 255);
+                Arrays.fill(completeFile, (byte)255);
+                bitField[bitField.length - 1] = 0;
+                completeFile[bitField.length - 1] = 0;
                 	                
                 while (last != 0) 
                 {
                 	
                 	//setting the bits in the last byte of the bitfield
                 	bitField[bitField.length - 1] |= (1 << (8 - last));
+                	completeFile[bitField.length - 1] |= (1 << (8 - last));
                     last--;
                 }
                 
@@ -124,7 +130,23 @@ public class peerProcess {
 		}
 		else
 		{
-			Arrays.fill(bitField, (byte)0);
+			if (pieces % 8 == 0) 
+               	Arrays.fill(completeFile, (byte)255);
+            			
+            else 
+            {
+                int last = (int) pieces % 8;
+                
+                Arrays.fill(completeFile, (byte)255);
+                completeFile[bitField.length - 1] = 0;
+                	                
+                while (last != 0) 
+                {
+                	completeFile[bitField.length - 1] |= (1 << (8 - last));
+                    last--;
+                }
+                
+            }
 		}
 	
 		//Connect to the peers that have already started

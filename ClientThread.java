@@ -18,7 +18,6 @@ public class ClientThread extends Thread
 	config cfg;
 	Runnable intThread;
 	TCPMsgUtil util;
-	byte[] fileData;
 	boolean clientInterested;
 	Float downloadRate;
 	Long avgPieceDownloadTime;
@@ -36,8 +35,6 @@ public class ClientThread extends Thread
 		
 		try
 		{
-			
-			this.fileData = fileData;
 			
 			//initialize inputStream and outputStream
 			out = new BufferedOutputStream(requestSocket.getOutputStream());
@@ -181,14 +178,55 @@ public class ClientThread extends Thread
 		    			
 		    			int pcInd = ClientHelper.bytearray_to_int(pInd);
 		    			
-		    			byte[] pdata = util.readCompleteMsg(in, cfg.PieceSize);
+		    			int mLen = ClientHelper.bytearray_to_int(msgLength);
 		    			
+		    			byte[] pdata = util.readCompleteMsg(in, mLen-5);
+		    			
+		    			//Update bitField after receiving the piece
 		    			peerProcess.bitField[pcInd/8] |= 1 << (7-(pcInd%8));
 		    			
+		    			//Store the received piece data at the appropriate location
+		    			int start = pcInd*cfg.PieceSize;
+		    			for(int i=0;i<cfg.PieceSize;i++) {
+		    				peerProcess.fileData[start+i] = pdata[i];
+		    			}
+		    			
+		    			//Update the download rate from this peer
 		    			piecesRcvd++;
 		    			total_time += (System.currentTimeMillis() - req_time)/1000;
 		    			downloadRate = (float) ((piecesRcvd*cfg.PieceSize)/total_time);
 		    			
+		    			//Send have messages to all the peers
+		    			for(ClientThread ct : peerProcess.ClientThreads) {
+		    				ct.sendHaveMessage(pInd);
+		    			}
+		    			
+		    			//Check if this peer has any useful pieces and send another request message
+		    			pcInd = util.getPieceIndexToRequest(peerProcess.bitField, peerBitField, peerProcess.requested);
+		    			
+		    			if(pcInd>=0) {
+		    				requestedIndex = pcInd;
+		    				peerProcess.requested[pcInd].set(true);
+		    				util.sendRequestMessage(out, pcInd);
+		    				req_time = System.currentTimeMillis();
+		    			} else {
+		    				util.sendNotInterestedMessage(out);
+		    				
+		    				//Check if the peer has the complete file
+		    				if(Arrays.equals(peerProcess.bitField, peerProcess.completeFile)) {
+		    					
+		    					//Send not interested messages to all the peers
+				    			for(ClientThread ct : peerProcess.ClientThreads) {
+				    				ct.util.sendNotInterestedMessage(out);
+				    			}
+				    			
+				    			File file = new File("peer_" + peerProcess.Id + "/" + cfg.FileName);
+				    			
+				    			FileOutputStream fdata = new FileOutputStream(file);			
+								fdata.write(peerProcess.fileData);
+								fdata.close();
+		    				}
+		    			}
 		    			
 		    			break;
 		    			
@@ -222,38 +260,38 @@ public class ClientThread extends Thread
 	
 	//Method to send Unchoke message
 	public void sendUnchokeMessage() {
-		try {
-			//converting msg length to byte array
-			byte[] len = ClientHelper.int_to_bytearray(1);
+	
+		//converting msg length to byte array
+		byte[] len = ClientHelper.int_to_bytearray(1);
 			
-			//appending message type to msg length, no payload for unchoke message
-			byte[] res = ClientHelper.append_byte_to_bytearray(len, TCPMsgUtil.MessageType.UNCHOKE.val);
-			 
-			out.write(res);
-			out.flush();
-		} 
-		catch(IOException ioe) 
-		{
-			ioe.printStackTrace();
-		}
+		//appending message type to msg length, no payload for unchoke message
+		byte[] res = ClientHelper.append_byte_to_bytearray(len, TCPMsgUtil.MessageType.UNCHOKE.val);
+		 
+		util.sendMessage(out, res);
 	}
 	
 	//Method to send choke message
 	public void sendChokeMessage() {
-		try {
-			//converting msg length to byte array
-			byte[] len = ClientHelper.int_to_bytearray(1);
-			
-			//appending message type to msg length, no payload for choke message
-			byte[] res = ClientHelper.append_byte_to_bytearray(len, TCPMsgUtil.MessageType.CHOKE.val);
-			 
-			out.write(res);
-			out.flush();
-		} 
-		catch(IOException ioe) 
-		{
-			ioe.printStackTrace();
-		}
+		
+		//converting msg length to byte array
+		byte[] len = ClientHelper.int_to_bytearray(1);
+		
+		//appending message type to msg length, no payload for choke message
+		byte[] res = ClientHelper.append_byte_to_bytearray(len, TCPMsgUtil.MessageType.CHOKE.val);
+		 
+		util.sendMessage(out, res);
+	}
+	
+	//Method to send have message
+	public void sendHaveMessage(byte[] pieceIndex) {
+		
+		//converting msg length to byte array
+		byte[] len = ClientHelper.int_to_bytearray(5);
+				
+		//appending message type to msg length and then the payload for have message
+		byte[] res = ClientHelper.appendByteArray(ClientHelper.append_byte_to_bytearray(len, TCPMsgUtil.MessageType.HAVE.val), pieceIndex);
+				 
+		util.sendMessage(out, res);
 	}
 	
     //Update the stopping condition to true when the method is called. This results in closing the socket connection
