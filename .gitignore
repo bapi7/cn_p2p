@@ -4,3 +4,4 @@
 *.log
 peer_*/
 *.txt
+log*

@@ -1,6 +1,7 @@
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -9,6 +10,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class peerProcess {
@@ -17,6 +19,8 @@ public class peerProcess {
 	static ClientThread optUnchokedNeighbor;
 	static byte[] bitField, fileData, completeFile;
 	static AtomicBoolean[] requested;
+	static Logger LOGGER;
+	
 	ScheduledExecutorService scheduler =
 		     Executors.newScheduledThreadPool(3);
 	
@@ -27,8 +31,6 @@ public class peerProcess {
 	public static void main(String[] args) throws Exception 
 	{
 		
-		System.out.println("The peer process " + args[0] + " is running.");
-		
 		peerProcess peer = new peerProcess();
 		
 		//Storing the peer Id of this peer
@@ -36,6 +38,9 @@ public class peerProcess {
 		
 		//Initializing a config instance to use across all client threads
 		config cfg = new config();
+		
+		LogGenerator.LoggerSet();
+		LOGGER = LogGenerator.getMyLogger();
 		
 		//This list maintains all peers that have already started
 		List<RemotePeerInfo> connectedPeers = new ArrayList<RemotePeerInfo>();
@@ -50,27 +55,23 @@ public class peerProcess {
 		{
 			
 			if(Integer.parseInt(rpi.peerId) < Integer.parseInt(args[0])) 
-			{
 				connectedPeers.add(rpi);
-			}
 			
 			else if(Integer.parseInt(rpi.peerId) == Integer.parseInt(args[0])) 
 			{
+				
 				peer.port = Integer.parseInt(rpi.peerPort);
-				if(rpi.peerHasFile == "1")
-				{
+				
+				if(rpi.peerHasFile.equals("1"))
 					has_file = 1;
-				}
 				
 			}
 			
-			else 
-			{
-				
+			else
 				futurePeers.add(rpi);
-				
-			}
+			
 		}
+		
 
 		int size = cfg.noOfBytes;
 		int pieces = cfg.noOfPieces;
@@ -79,7 +80,7 @@ public class peerProcess {
 		
 		//Array to monitor if a piece has been already requested
 		requested = new AtomicBoolean[pieces];
-		Arrays.fill(requested, false);
+		Arrays.fill(requested, new AtomicBoolean(false));
 		
 		
 		fileData = new byte[cfg.FileSize];
@@ -88,7 +89,6 @@ public class peerProcess {
 		//Check if the peer has the file and then set the all the bits to 1 if it has the file and 0 if doesn't
 		if(has_file == 1)
 		{
-			
 			try 
 			{
 				File file = new File("peer_"+ peerProcess.Id + "/" + cfg.FileName);			
@@ -111,8 +111,10 @@ public class peerProcess {
             else 
             {
                 int last = (int) pieces % 8;
+                
                 Arrays.fill(bitField, (byte) 255);
                 Arrays.fill(completeFile, (byte)255);
+                
                 bitField[bitField.length - 1] = 0;
                 completeFile[bitField.length - 1] = 0;
                 	                
@@ -148,63 +150,81 @@ public class peerProcess {
                 
             }
 		}
-	
+		
 		//Connect to the peers that have already started
 		for(RemotePeerInfo pInfo : connectedPeers) 
 		{			
 			try 
 			{
-				
 				ClientThread client = new ClientThread(new Socket(pInfo.peerAddress, 
-						Integer.parseInt(pInfo.peerPort)), true, pInfo.peerId,cfg, fileData);
+						Integer.parseInt(pInfo.peerPort)), true, pInfo.peerId,cfg);
 				
 				client.start();
 				ClientThreads.add(client);
+				
+				LOGGER.info("Peer " + Id + " makes a connection to Peer " + pInfo.peerId + ".");
 			} 			
 			catch(Exception ex) 
 			{
 				ex.printStackTrace();
+				LOGGER.info(ex.toString());
 			}
 			
 		}
 		
-		List<ClientThread> cts = ClientThreads; 
-		if(cts.size() > cfg.NumberOfPreferredNeighbors)
-			cts = ClientThreads.subList(0, cfg.NumberOfPreferredNeighbors);
 		
-		//Initializing the preferred neighbors
-		cts.stream().map(ct -> ct.choked = false;));
+		ServerSocket ss = new ServerSocket(peer.port);
 		
-		//Initializing the optimistically unchoked neighbor
-		List<ClientThread> chokedInterestedNeighbors = ClientThreads.stream().filter(ct -> ct.choked && ct.clientInterested).collect(Collectors.toList());
-		if(chokedInterestedNeighbors.isEmpty())
-			optUnchokedNeighbor = null;
-		else{
-			optUnchokedNeighbor = chokedInterestedNeighbors.get(new Random().nextInt(chokedInterestedNeighbors.size()));
-		}
 		
 		//Sockets listeners waiting for connection request from future peers in PeerInfo.cfg
 		try 
-		{			
-			ServerSocket ss = new ServerSocket(peer.port);			
+		{
+			
 			for(RemotePeerInfo pInfo : futurePeers) 
 			{
-				Socket socket = ss.accept();			
-				if(socket != null) 
-				{
-					ClientThread nc= new ClientThread(socket, false, pInfo.peerId, cfg, 
-							fileData);
-                	nc.start();
-                	ClientThreads.add(nc);               	
-                }
+				LOGGER.info("Listening at port: " + peer.port);
+				
+				Runnable listener = () -> {
+					
+					try {
+						ClientThread nc = new ClientThread(ss.accept(), false, pInfo.peerId, cfg);
+						LOGGER.info("Peer " + Id + " is connected from Peer " + pInfo.peerId + ".");
+						
+						ClientThreads.add(nc);
+						nc.start();
+					} catch (IOException e) {
+						LOGGER.info(e.getMessage());
+					}
+					
+					
+				};
+				
+				new Thread(listener).start();
 				
             }
+			
 			
         } 
 		catch (Exception ex) 
 		{			
-			ex.printStackTrace();       
+			ex.printStackTrace();
 		}
+		
+		/*List<ClientThread> cts = ClientThreads; 
+		if(cts.size() > cfg.NumberOfPreferredNeighbors)
+			cts = ClientThreads.subList(0, cfg.NumberOfPreferredNeighbors);
+		
+		//Initializing the preferred neighbors
+		cts.stream().map(ct -> ct.choked = false);
+		*/
+		//Initializing the optimistically unchoked neighbor
+		List<ClientThread> chokedInterestedNeighbors = ClientThreads.stream().filter(ct -> ct.choked && ct.clientInterested).collect(Collectors.toList());
+
+		if(chokedInterestedNeighbors.isEmpty())
+			optUnchokedNeighbor = null;
+		else
+			optUnchokedNeighbor = chokedInterestedNeighbors.get(new Random().nextInt(chokedInterestedNeighbors.size()));
+		
 		
 		peer.updatePreferredNeighbors(cfg.NumberOfPreferredNeighbors, cfg.UnchokingInterval);
 		peer.assignOptimisticallyUnchokedNeighbor(cfg.OptimisticUnchokingInterval);
@@ -216,59 +236,98 @@ public class peerProcess {
 		
 		Runnable updatepn = () -> {
 			
-			//Order the peers by download rate
-			Collections.sort(ClientThreads, (ct1, ct2) -> ct2.downloadRate.compareTo(ct1.downloadRate));
+			try {
+				//Order the peers by download rate
+				
+				Collections.sort(ClientThreads, (ct1, ct2) -> ct2.downloadRate.compareTo(ct1.downloadRate));
 			
-			int neighbors = 0;
-			
-			//Iterate the client threads and update choke/unchoke status of each thread using download rates and interested status 
-			for(int i=0;i<ClientThreads.size();i++) {
-				ClientThread ct = ClientThreads.get(i);
-				if(ct.clientInterested) {
-					//First k interested peers are unchoked
-					if(neighbors<k) {
-						if(ct.choked) {
-							ct.choked = false;
-							ct.sendUnchokeMessage();
-						}
-						
-					} 
-					//Remaining peers are choked
-					else {
-						if(!ct.choked && ct != optUnchokedNeighbor) {
-							ct.choked = true;
-							ct.sendChokeMessage();
-						}
-					}
+				int neighbors = 0;
+				List<String> neighborList = new ArrayList<String>();
+				
+				//Iterate the client threads and update choke/unchoke status of each thread using download rates and interested status 
+				for(int i=0;i<ClientThreads.size();i++) {
+				
+					ClientThread ct = ClientThreads.get(i);
+				
+					if(ct.clientInterested)
+					{
 					
-					neighbors++;
+						//First k interested peers are unchoked
+						if(neighbors<k) 
+						{	
+							if(ct.choked) 
+							{
+								ct.choked = false;
+								ct.sendUnchokeMessage();
+							}
+							neighborList.add(ct.peerID);
+						} 
+						//Remaining peers are choked
+						else 
+						{
+						
+							if(!ct.choked && ct != optUnchokedNeighbor) 
+							{
+								ct.choked = true;
+								ct.sendChokeMessage();
+							}
+						
+						}
+					
+						neighbors++;
+					}
 				}
+				LOGGER.info("Peer " + Id + " has the preferred neighbors " + String.join(",", neighborList) + ".");
+			} catch(Exception e) {
+				e.printStackTrace();
+				LOGGER.info(e.toString());
 			}
+			
+				
 			
 		};
 		scheduler.scheduleAtFixedRate(updatepn, p, p, TimeUnit.SECONDS);
 	}
 	
 	public void assignOptimisticallyUnchokedNeighbor(int m) {
+		
 		Runnable assignOUN = () -> {
+			
 			List<ClientThread> chokedInterestedNeighbors = ClientThreads.stream().filter(ct -> ct.choked && ct.clientInterested).collect(Collectors.toList());
-			if(chokedInterestedNeighbors.isEmpty()) {
+			
+			if(chokedInterestedNeighbors.isEmpty()) 
+			{
+				
 				if(optUnchokedNeighbor!=null) {
+					
 					if(!optUnchokedNeighbor.choked)	{
+						
 						optUnchokedNeighbor.choked = true;
 						optUnchokedNeighbor.sendChokeMessage();
+						
 					}
+					
 					optUnchokedNeighbor = null;
 				}
-			} else {
-				if(optUnchokedNeighbor!=null)	{
+			} 
+			
+			else 
+			{
+				
+				if(optUnchokedNeighbor!=null)	
+				{
 					optUnchokedNeighbor.choked = true;
 					optUnchokedNeighbor.sendChokeMessage();
 				}
+				
 				optUnchokedNeighbor = chokedInterestedNeighbors.get(ThreadLocalRandom.current().nextInt(ClientThreads.size()));
+				
 				optUnchokedNeighbor.choked = false;
 				optUnchokedNeighbor.sendUnchokeMessage();
+				
 			}
+			
+			LOGGER.info("Peer " + Id + " has the optimistically unchoked neighbor " + optUnchokedNeighbor.peerID + ".");
 		};
 		
 		scheduler.scheduleAtFixedRate(assignOUN, m, m, TimeUnit.SECONDS);

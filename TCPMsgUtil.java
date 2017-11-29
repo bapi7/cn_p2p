@@ -44,9 +44,22 @@ public class TCPMsgUtil
 			this.val = b;
 		}
 		
+		public static MessageType fromValue(byte value) {
+			switch (value) {
+				case (byte)0:  return MessageType.CHOKE;
+				case (byte)1:  return MessageType.UNCHOKE;
+				case (byte)2:  return MessageType.INTERESTED;
+				case (byte)3:  return MessageType.NOTINTERESTED;
+				case (byte)4:  return MessageType.HAVE;
+				case (byte)5:  return MessageType.BITFIELD;
+				case (byte)6:  return MessageType.REQUEST;
+				case (byte)7:  return MessageType.PIECE;
+				default: throw new IllegalArgumentException();
+			}
+		}
+		
 	}
 	
-	byte[] want;
 	
 	//Method to construct a handshake message
 	static byte[] constructHandshakeMessage(String peerID) 
@@ -79,27 +92,28 @@ public class TCPMsgUtil
 	}
 	
 	//Method to receive a handshake message to a peer
-	public int receiveHandshakeMessage(InputStream in, int expectedPeerId)
+	public int receiveHandshakeMessage(InputStream in)
 	{
 		
-		Integer pId = -1;
+		String pId = "";
 		
 		try 
 		{
             
-			byte[] rcv = new byte[32];         
-			in.read(rcv);			
-			byte[] header = Arrays.copyOfRange(rcv, 0, 18);			
-			byte[] pInd = Arrays.copyOfRange(rcv, 28, 32);
-            pId= Integer.parseInt(new String(pInd));            
-            if(header.toString() != "P2PFILESHARINGPROJ" || pId != expectedPeerId)
-            {
-				return -1;
-            }
+			byte[] header = new byte[18];         
+			in.read(header);			
+			byte[] zero = new byte[10];
+			in.read(zero);
+			byte[] pInd = new byte[4];
+			in.read(pInd);
+			
+			String hdr = new String(header);
+			
+            pId= new String(pInd);
             
-            /*if(isClient)
-                if(peerHandShakeMap.containsKey(pId) && peerHandShakeMap.get(pId) == false)
-                        peerHandShakeMap.put(pId, true);*/
+            if(!hdr.equals("P2PFILESHARINGPROJ"))
+            	return -1;
+            
         } 
 		
 		catch(IOException ioe) 
@@ -107,7 +121,7 @@ public class TCPMsgUtil
 			ioe.printStackTrace();
 		}
 		
-		return pId;
+		return Integer.parseInt(pId);
 	}
 
 	//Method to send an bit field message to a peer
@@ -120,10 +134,11 @@ public class TCPMsgUtil
 	}
 
 	//Method to receive a bit field message to a peer
-	public synchronized byte[] receiveBitFieldMessage(InputStream in, int len) {
+	public synchronized byte[] receiveBitFieldMessage(InputStream in) {
 		
 		byte[] msgLength, msgType;
 		byte[] rcv = new byte[0];
+		int len = 0;
 		
 		try
 		{
@@ -133,7 +148,9 @@ public class TCPMsgUtil
 			in.read(msgLength);			
 			msgType = new byte[1];			
 			in.read(msgType);
-			rcv = new byte[len];
+			
+			len = ClientHelper.bytearray_to_int(msgLength);
+			rcv = new byte[len-1];
 			
 			if(msgType[0] == MessageType.BITFIELD.val) 
 			{				
@@ -151,6 +168,7 @@ public class TCPMsgUtil
 	
 	//Method to fetch the next piece index to request
 	public int getPieceIndexToRequest(byte[] bitField, byte[] rcvBitField, AtomicBoolean[] reqBitField) {
+		byte[] want = new byte[bitField.length];
 		byte[] req = new byte[bitField.length];
 		Arrays.fill(req, (byte)0);
 		//convert reqBitField to byte array
@@ -161,7 +179,7 @@ public class TCPMsgUtil
 		
 		for(int i=0;i<bitField.length;i++) 
 		{
-			reqAndCurr[i] = (byte)(bitField[i] | reqBitFieldByte[i]);
+			reqAndCurr[i] = (byte)(bitField[i] & reqBitFieldByte[i]);
 			want[i] = (byte)((reqAndCurr[i] ^ rcvBitField[i]) & ~reqAndCurr[i]);
 			
 			if(want[i]!=0)
@@ -190,7 +208,7 @@ public class TCPMsgUtil
 		
 	//Method to check if the peer is interested in any piece from the connected peer
 	public boolean isInterested(byte[] bitField, byte[] rcvBitField) {
-		
+		byte[] want = new byte[bitField.length];
 		boolean isInt = false;		
 		byte[] missing = new byte[bitField.length];		
 				
