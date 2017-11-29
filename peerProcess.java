@@ -293,46 +293,54 @@ public class peerProcess {
 		
 		Runnable assignOUN = () -> {
 			
-			List<ClientThread> chokedInterestedNeighbors = ClientThreads.stream().filter(ct -> ct.choked && ct.clientInterested).collect(Collectors.toList());
+			try {
+				List<ClientThread> chokedInterestedNeighbors = ClientThreads.stream().filter(ct -> ct.choked && ct.clientInterested).collect(Collectors.toList());
 			
-			if(chokedInterestedNeighbors.isEmpty()) 
-			{
-				
-				if(optUnchokedNeighbor!=null) {
+			
+				if(chokedInterestedNeighbors.isEmpty()) 
+				{
 					
-					if(!optUnchokedNeighbor.choked)	{
+					if(optUnchokedNeighbor!=null) {
+					
+						if(!optUnchokedNeighbor.choked)	{
 						
+							optUnchokedNeighbor.choked = true;
+							optUnchokedNeighbor.sendChokeMessage();
+						
+						}
+					
+						optUnchokedNeighbor = null;
+					}
+				} 
+			
+				else 
+				{
+				
+					if(optUnchokedNeighbor!=null)	
+					{
 						optUnchokedNeighbor.choked = true;
 						optUnchokedNeighbor.sendChokeMessage();
-						
 					}
-					
-					optUnchokedNeighbor = null;
-				}
-			} 
-			
-			else 
-			{
 				
-				if(optUnchokedNeighbor!=null)	
-				{
-					optUnchokedNeighbor.choked = true;
-					optUnchokedNeighbor.sendChokeMessage();
+					optUnchokedNeighbor = chokedInterestedNeighbors.get(ThreadLocalRandom.current().nextInt(ClientThreads.size()));
+				
+					optUnchokedNeighbor.choked = false;
+					optUnchokedNeighbor.sendUnchokeMessage();
+				
 				}
 				
-				optUnchokedNeighbor = chokedInterestedNeighbors.get(ThreadLocalRandom.current().nextInt(ClientThreads.size()));
-				
-				optUnchokedNeighbor.choked = false;
-				optUnchokedNeighbor.sendUnchokeMessage();
-				
+				if(optUnchokedNeighbor!=null)
+					LOGGER.info("Peer " + Id + " has the optimistically unchoked neighbor " + optUnchokedNeighbor.peerID + ".");
+			} catch(Exception e) {
+				e.printStackTrace();
+				System.out.println("Error: " + e.toString());
 			}
-			
-			LOGGER.info("Peer " + Id + " has the optimistically unchoked neighbor " + optUnchokedNeighbor.peerID + ".");
 		};
 		
 		scheduler.scheduleAtFixedRate(assignOUN, m, m, TimeUnit.SECONDS);
 	}
 	
+	//TODO
 	public void monitorFileSharingStatus() {
 		
 	}
