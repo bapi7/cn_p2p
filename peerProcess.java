@@ -9,7 +9,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -19,12 +18,11 @@ public class peerProcess {
 	static ClientThread optUnchokedNeighbor;
 	static byte[] bitField, fileData, completeFile;
 	static AtomicBoolean[] requested;
-	static Logger LOGGER;
+	static Logger logger;
 	
 	ScheduledExecutorService scheduler =
 		     Executors.newScheduledThreadPool(3);
 	
-	final static ReentrantLock lock = new ReentrantLock();
 	Integer port = 8000;
 	static Integer Id;
 	static ServerSocket ss;
@@ -40,8 +38,7 @@ public class peerProcess {
 		//Initializing a config instance to use across all client threads
 		config cfg = new config();
 		
-		LogGenerator.LoggerSet();
-		LOGGER = LogGenerator.getMyLogger();
+		logger = PeerLogger.getLogger(Id);
 		
 		//This list maintains all peers that have already started
 		List<RemotePeerInfo> connectedPeers = new ArrayList<RemotePeerInfo>();
@@ -163,12 +160,12 @@ public class peerProcess {
 				client.start();
 				ClientThreads.add(client);
 				
-				LOGGER.info("Peer " + Id + " makes a connection to Peer " + pInfo.peerId + ".");
+				logger.info("Peer " + Id + " makes a connection to Peer " + pInfo.peerId + ".");
 			} 			
 			catch(Exception ex) 
 			{
 				ex.printStackTrace();
-				LOGGER.info(ex.toString());
+				logger.info(ex.toString());
 			}
 			
 		}
@@ -183,18 +180,18 @@ public class peerProcess {
 			
 			for(RemotePeerInfo pInfo : futurePeers) 
 			{
-				LOGGER.info("Listening at port: " + peer.port);
+				logger.info("Listening at port: " + peer.port);
 				
 				Runnable listener = () -> {
 					
 					try {
 						ClientThread nc = new ClientThread(ss.accept(), false, pInfo.peerId, cfg);
-						LOGGER.info("Peer " + Id + " is connected from Peer " + pInfo.peerId + ".");
+						logger.info("Peer " + Id + " is connected from Peer " + pInfo.peerId + ".");
 						
 						ClientThreads.add(nc);
 						nc.start();
 					} catch (IOException e) {
-						LOGGER.info(e.getMessage());
+						logger.info(e.getMessage());
 					}
 					
 					
@@ -278,10 +275,10 @@ public class peerProcess {
 						neighbors++;
 					}
 				}
-				LOGGER.info("Peer " + Id + " has the preferred neighbors " + String.join(",", neighborList) + ".");
+				logger.info("Peer " + Id + " has the preferred neighbors " + String.join(",", neighborList) + ".");
 			} catch(Exception e) {
 				e.printStackTrace();
-				LOGGER.info(e.toString());
+				logger.info(e.toString());
 			}
 			
 				
@@ -331,7 +328,7 @@ public class peerProcess {
 				}
 				
 				if(optUnchokedNeighbor!=null)
-					LOGGER.info("Peer " + Id + " has the optimistically unchoked neighbor " + optUnchokedNeighbor.peerID + ".");
+					logger.info("Peer " + Id + " has the optimistically unchoked neighbor " + optUnchokedNeighbor.peerID + ".");
 			} catch(Exception e) {
 				e.printStackTrace();
 				System.out.println("Error: " + e.toString());
@@ -356,6 +353,7 @@ public class peerProcess {
 			 
 			}
 			
+			System.out.println("Complete file: " + complete);
 			if(complete && Arrays.equals(bitField, completeFile)) {
 				
 				//Setting the stopping condition to true for all client threads
@@ -369,9 +367,9 @@ public class peerProcess {
 					ss.close();
 				} catch (IOException e) {
 					e.printStackTrace();
-					LOGGER.info("Error while closing server socket");
+					logger.info("Error while closing server socket");
 				}
-				LOGGER.info("Ending the peer process: " + Id);
+				logger.info("Ending the peer process: " + Id);
 				
 				System.exit(0);
 			}

@@ -70,7 +70,7 @@ public class ClientThread extends Thread
 		catch(IOException ioe) 
 		{	
 			ioe.printStackTrace();
-			peerProcess.LOGGER.info("IOException: " + ioe.toString());
+			peerProcess.logger.info("IOException: " + ioe.toString());
 		}
 		
 	}
@@ -96,7 +96,7 @@ public class ClientThread extends Thread
 		    	
 		    	switch(inpMsg) {
 		    		case CHOKE:
-		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " is choked by " + peerID + ".");
+		    			peerProcess.logger.info("Peer " + peerProcess.Id + " is choked by " + peerID + ".");
 		    			byte indByte = peerProcess.bitField[requestedIndex/8];
 		    			
 		    			if(((1 << (7 - (requestedIndex%8))) & indByte) == 0) {
@@ -106,7 +106,7 @@ public class ClientThread extends Thread
 		    			break;
 		    			
 		    		case UNCHOKE:
-		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " is unchoked by " + peerID + ".");
+		    			peerProcess.logger.info("Peer " + peerProcess.Id + " is unchoked by " + peerID + ".");
 		    			
 		    			//Fetch the piece index to request
 		    			int pIndex = util.getPieceIndexToRequest(peerProcess.bitField, peerBitField, peerProcess.requested);
@@ -121,13 +121,13 @@ public class ClientThread extends Thread
 		    			break;
 		    			
 		    		case INTERESTED:
-		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " received the 'interested' message from " + peerID + ".");
+		    			peerProcess.logger.info("Peer " + peerProcess.Id + " received the 'interested' message from " + peerID + ".");
 		    			if(!clientInterested)
 		    				clientInterested = true;
 		    			break;
 		    			
 		    		case NOTINTERESTED:
-		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " received the 'not interested' message from " + peerID + ".");
+		    			peerProcess.logger.info("Peer " + peerProcess.Id + " received the 'not interested' message from " + peerID + ".");
 		    			clientInterested = false;
 		    			choked = true;
 		    			break;
@@ -138,7 +138,7 @@ public class ClientThread extends Thread
 		    			byte[] pieceIndexbytes = util.readCompleteMsg(in, 4);
 		    			int pieceIndex = ClientHelper.bytearray_to_int(pieceIndexbytes);
 		    			
-		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " received the 'have' message from " + peerID + " for the piece " + pieceIndex + ".");
+		    			peerProcess.logger.info("Peer " + peerProcess.Id + " received the 'have' message from " + peerID + " for the piece " + pieceIndex + ".");
 		    			
 		    			//Update the peer's bitfield
 		    			peerBitField[pieceIndex/8] |=  (1 << (7 - (pieceIndex%8)));
@@ -158,7 +158,7 @@ public class ClientThread extends Thread
 		    			
 		    			int pieceInd = ClientHelper.bytearray_to_int(payload);
 		    			
-		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " received the 'request' message from " + peerID + " for the piece " + pieceInd + ".");
+		    			peerProcess.logger.info("Peer " + peerProcess.Id + " received the 'request' message from " + peerID + " for the piece " + pieceInd + ".");
 		    			int startInd = pieceInd*cfg.PieceSize;
 		    			
 		    			try {
@@ -200,7 +200,7 @@ public class ClientThread extends Thread
 		    			}
 		    			
 		    			piecesRcvd++;
-		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " has downloaded the piece " + pcInd + " from " + 
+		    			peerProcess.logger.info("Peer " + peerProcess.Id + " has downloaded the piece " + pcInd + " from " + 
 		    					peerID + ". Now the number of pieces it has is " + piecesRcvd + ".");
 		    			
 		    			
@@ -238,7 +238,7 @@ public class ClientThread extends Thread
 				    			FileOutputStream fdata = new FileOutputStream(file);			
 								fdata.write(peerProcess.fileData);
 								fdata.close();
-								peerProcess.LOGGER.info("Peer " + peerProcess.Id + " has downloaded the complete file.");
+								peerProcess.logger.info("Peer " + peerProcess.Id + " has downloaded the complete file.");
 		    				}
 		    			}
 		    			
@@ -259,7 +259,7 @@ public class ClientThread extends Thread
 	
 	public void setStoppingCondition(boolean stop) {
 		stoppingCondition = stop;
-		
+		peerProcess.logger.info("setStoppingCondition called");
 		if(stop) {
 			if(!requestSocket.isClosed())
 				try {
