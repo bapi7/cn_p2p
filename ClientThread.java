@@ -116,8 +116,6 @@ public class ClientThread extends Thread
 		    				peerProcess.requested[pIndex].set(true);
 		    				util.sendRequestMessage(out, pIndex);
 		    				req_time = System.nanoTime();
-		    			} else {
-		    				util.sendNotInterestedMessage(out);
 		    			}
 		    			
 		    			break;
@@ -132,7 +130,6 @@ public class ClientThread extends Thread
 		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " received the 'not interested' message from " + peerID + ".");
 		    			clientInterested = false;
 		    			choked = true;
-		    			//sendChokeMessage();
 		    			break;
 		    			
 		    		case HAVE:
@@ -162,7 +159,6 @@ public class ClientThread extends Thread
 		    			int pieceInd = ClientHelper.bytearray_to_int(payload);
 		    			
 		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " received the 'request' message from " + peerID + " for the piece " + pieceInd + ".");
-		    			
 		    			int startInd = pieceInd*cfg.PieceSize;
 		    			
 		    			try {
@@ -242,7 +238,7 @@ public class ClientThread extends Thread
 				    			FileOutputStream fdata = new FileOutputStream(file);			
 								fdata.write(peerProcess.fileData);
 								fdata.close();
-								
+								peerProcess.LOGGER.info("Peer " + peerProcess.Id + " has downloaded the complete file.");
 		    				}
 		    			}
 		    			

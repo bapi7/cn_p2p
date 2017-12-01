@@ -356,12 +356,21 @@ public class peerProcess {
 			 
 			}
 			
-			if(complete) {
+			if(complete && Arrays.equals(bitField, completeFile)) {
 				
 				//Setting the stopping condition to true for all client threads
 				for(ClientThread ct : ClientThreads)
 					ct.stoppingCondition = true;
 			 	
+				//Ending the scheduled processes
+				scheduler.shutdown();
+				try {
+					//Closing the server socket connection
+					ss.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+					LOGGER.info("Error while closing server socket");
+				}
 				LOGGER.info("Ending the peer process: " + Id);
 				
 				System.exit(0);
