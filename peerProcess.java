@@ -360,7 +360,7 @@ public class peerProcess {
 				
 				//Setting the stopping condition to true for all client threads
 				for(ClientThread ct : ClientThreads)
-					ct.stoppingCondition = true;
+					ct.setStoppingCondition(true);
 			 	
 				//Ending the scheduled processes
 				scheduler.shutdown();
@@ -378,7 +378,7 @@ public class peerProcess {
 			
 		};
 		
-		scheduler.scheduleAtFixedRate(checkPeerFile, 7, 5, TimeUnit.SECONDS);
+		scheduler.scheduleAtFixedRate(checkPeerFile, 5, 5, TimeUnit.SECONDS);
 	}
 
 }

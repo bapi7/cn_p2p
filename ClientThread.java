@@ -251,24 +251,22 @@ public class ClientThread extends Thread
 			}
 		} 
 		
-		catch(IOException ioException)
-		{
-				ioException.printStackTrace();				
-		} 
+		catch(IOException ioException) {
+			ioException.printStackTrace();				
+		}
 		
-		finally
-		{
-			//Close connections
-			try
-			{				
-				in.close();
-				out.close();
-				requestSocket.close();				
-			} 
-			catch(IOException ioException)
-			{				
-				ioException.printStackTrace();				
-			}
+	}
+	
+	public void setStoppingCondition(boolean stop) {
+		stoppingCondition = stop;
+		
+		if(stop) {
+			if(!requestSocket.isClosed())
+				try {
+					requestSocket.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 		}
 	}
 	
