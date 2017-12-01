@@ -26,16 +26,14 @@ public class ClientThread extends Thread
 	List<Integer> preferredNeighbors = new ArrayList<Integer>();
 	boolean stoppingCondition = false;
 
-	public ClientThread(Socket s, boolean isClient, String peerID, config cfg) 
-	{
+	public ClientThread(Socket s, boolean isClient, String peerID, config cfg) {
 		
 		this.cfg = cfg;
 		this.requestSocket = s;
 		this.isClient = isClient;
 		util = new TCPMsgUtil();
 		
-		try
-		{
+		try {
 			
 			//initialize inputStream and outputStream
 			out = new BufferedOutputStream(requestSocket.getOutputStream());
@@ -58,34 +56,21 @@ public class ClientThread extends Thread
 	        	
 	        }
 	        
-	        //peerProcess.lock.lock();
-	        //try{
-	        peerProcess.LOGGER.info("Sending bitfield message");
 	        
-	        	util.sendBitFieldMessage(out, peerProcess.bitField);	                
+	        util.sendBitFieldMessage(out, peerProcess.bitField);	                
 		        
-	        	peerProcess.LOGGER.info("Receiving bitfield message");
-		        peerBitField = util.receiveBitFieldMessage(in);
+	        peerBitField = util.receiveBitFieldMessage(in);
 
-		        if(util.isInterested(peerProcess.bitField, peerBitField))
-		        {
-		        	peerProcess.LOGGER.info("Sending interested message");
-		        	util.sendInterestedMessage(out);
-		        }
-		        else 
-		        {
-		        	peerProcess.LOGGER.info("Sending not interested message");
-		            util.sendNotInterestedMessage(out);
-		        }
-	        //} finally {
-	        //	peerProcess.lock.unlock();
-	        //}
-	        
+		    if(util.isInterested(peerProcess.bitField, peerBitField))
+		    	util.sendInterestedMessage(out);
+		    else
+		    	util.sendNotInterestedMessage(out);
 	        
 		} 		
 		catch(IOException ioe) 
 		{	
 			ioe.printStackTrace();
+			peerProcess.LOGGER.info("IOException: " + ioe.toString());
 		}
 		
 	}
@@ -104,13 +89,10 @@ public class ClientThread extends Thread
 		    while(!stoppingCondition) 
 			{
 		    	
-		    	peerProcess.LOGGER.info("Bytes that can be read: " + String.valueOf(in.available()));
 		    	in.read(msgLength);
 		    	in.read(msgType);
 		    	
 		    	TCPMsgUtil.MessageType inpMsg = TCPMsgUtil.MessageType.fromValue(msgType[0]);
-		    	
-		    	peerProcess.LOGGER.info(inpMsg.toString());
 		    	
 		    	switch(inpMsg) {
 		    		case CHOKE:
@@ -125,9 +107,10 @@ public class ClientThread extends Thread
 		    			
 		    		case UNCHOKE:
 		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " is unchoked by " + peerID + ".");
+		    			
 		    			//Fetch the piece index to request
 		    			int pIndex = util.getPieceIndexToRequest(peerProcess.bitField, peerBitField, peerProcess.requested);
-		    			peerProcess.LOGGER.info("PieceIndex: " + pIndex);
+		    			
 		    			if(pIndex>=0) {
 		    				requestedIndex = pIndex;
 		    				peerProcess.requested[pIndex].set(true);
@@ -159,17 +142,18 @@ public class ClientThread extends Thread
 		    			int pieceIndex = ClientHelper.bytearray_to_int(pieceIndexbytes);
 		    			
 		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " received the 'have' message from " + peerID + " for the piece " + pieceIndex + ".");
+		    			
+		    			//Update the peer's bitfield
+		    			peerBitField[pieceIndex/8] |=  (1 << (7 - (pieceIndex%8)));
+		    			
 		    			byte indexByte = peerProcess.bitField[pieceIndex/8];
 		    			//Checking if it has the piece, if not send interested message
-		    			if(((1 << (7 - (pieceIndex%8))) & indexByte) == 0) {
+		    			if(((1 << (7 - (pieceIndex%8))) & indexByte) == 0)
 		    				util.sendInterestedMessage(out);
-		    				peerBitField[pieceIndex/8] |=  (1 << (7 - (pieceIndex%8)));
-		    			}
 		    			
-		    			else 
-		    	        { 
-		    	            util.sendNotInterestedMessage(out);
-		    	        }
+		    			else
+		    				util.sendNotInterestedMessage(out);
+		    			
 		    			break;
 		    			
 		    		case REQUEST:
@@ -177,7 +161,7 @@ public class ClientThread extends Thread
 		    			
 		    			int pieceInd = ClientHelper.bytearray_to_int(payload);
 		    			
-		    			System.out.println("Piece Index request:" + pieceInd);
+		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " received the 'request' message from " + peerID + " for the piece " + pieceInd + ".");
 		    			
 		    			int startInd = pieceInd*cfg.PieceSize;
 		    			
@@ -207,8 +191,6 @@ public class ClientThread extends Thread
 		    			int pcInd = ClientHelper.bytearray_to_int(pInd);
 		    			
 		    			int mLen = ClientHelper.bytearray_to_int(msgLength);
-		    			System.out.println("Requested: "+requestedIndex);
-		    			System.out.println("Received: "+pcInd);
 		    			
 		    			byte[] pdata = util.readCompleteMsg(in, mLen-5);
 		    			
@@ -238,8 +220,6 @@ public class ClientThread extends Thread
 		    			//Check if this peer has any useful pieces and send another request message
 		    			pcInd = util.getPieceIndexToRequest(peerProcess.bitField, peerBitField, peerProcess.requested);
 		    			
-		    			System.out.println("Next Piece Index: "+pcInd);
-		    			
 		    			if(pcInd>=0) {
 		    				requestedIndex = pcInd;
 		    				peerProcess.requested[pcInd].set(true);
@@ -262,6 +242,7 @@ public class ClientThread extends Thread
 				    			FileOutputStream fdata = new FileOutputStream(file);			
 								fdata.write(peerProcess.fileData);
 								fdata.close();
+								
 		    				}
 		    			}
 		    			
@@ -331,32 +312,4 @@ public class ClientThread extends Thread
 		util.sendMessage(out, res);
 	}
 	
-    //Update the stopping condition to true when the method is called. This results in closing the socket connection
-    public void closeClientThread(boolean end) 
-    {
-        
-    	stoppingCondition = end;
-        
-    	if(end == true)
-    	{
-        
-    		try
-    		{
-                if(!requestSocket.isClosed()) {
-                	if(!requestSocket.isInputShutdown())
-                		in.close();
-                	if(!requestSocket.isOutputShutdown())
-                		out.close();
-    				requestSocket.close();
-                }
-            }
-    		
-    		catch (IOException e) 
-    		{    
-               System.out.println(e.getMessage());
-    		}
-        		
-    	}
-            
-    }
 }

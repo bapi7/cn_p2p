@@ -27,6 +27,7 @@ public class peerProcess {
 	final static ReentrantLock lock = new ReentrantLock();
 	Integer port = 8000;
 	static Integer Id;
+	static ServerSocket ss;
 	
 	public static void main(String[] args) throws Exception 
 	{
@@ -173,7 +174,7 @@ public class peerProcess {
 		}
 		
 		
-		ServerSocket ss = new ServerSocket(peer.port);
+		ss = new ServerSocket(peer.port);
 		
 		
 		//Sockets listeners waiting for connection request from future peers in PeerInfo.cfg
@@ -340,9 +341,35 @@ public class peerProcess {
 		scheduler.scheduleAtFixedRate(assignOUN, m, m, TimeUnit.SECONDS);
 	}
 	
-	//TODO
+	
 	public void monitorFileSharingStatus() {
+		Runnable checkPeerFile = () -> {
+			
+			boolean complete = true;
+			
+			for(ClientThread ct : ClientThreads) {
+				//Check if each peer has received the complete file or not
+				if(!Arrays.equals(ct.peerBitField, completeFile)) {
+					complete = false;
+					break;
+				}
+			 
+			}
+			
+			if(complete) {
+				
+				//Setting the stopping condition to true for all client threads
+				for(ClientThread ct : ClientThreads)
+					ct.stoppingCondition = true;
+			 	
+				LOGGER.info("Ending the peer process: " + Id);
+				
+				System.exit(0);
+			}
+			
+		};
 		
+		scheduler.scheduleAtFixedRate(checkPeerFile, 7, 5, TimeUnit.SECONDS);
 	}
 
 }
