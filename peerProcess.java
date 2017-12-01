@@ -347,13 +347,14 @@ public class peerProcess {
 			for(ClientThread ct : ClientThreads) {
 				//Check if each peer has received the complete file or not
 				if(!Arrays.equals(ct.peerBitField, completeFile)) {
+					logger.info("Peer " + ct.peerID + " yet to receive the full file.");
 					complete = false;
 					break;
 				}
 			 
 			}
 			
-			System.out.println("Complete file: " + complete);
+			logger.info("Complete file: " + complete);
 			if(complete && Arrays.equals(bitField, completeFile)) {
 				
 				//Setting the stopping condition to true for all client threads
