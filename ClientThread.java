@@ -8,11 +8,11 @@ import java.util.List;
 
 public class ClientThread extends Thread
 {
-	
+
 	Socket requestSocket;           //socket connect to the server
 	BufferedOutputStream out;         //stream write to the socket
 	BufferedInputStream in;          //stream read from the socket
-	
+
 	boolean isClient;
 	String peerID;
 	byte[] peerBitField;
@@ -26,17 +26,17 @@ public class ClientThread extends Thread
 	List<Integer> preferredNeighbors = new ArrayList<Integer>();
 	boolean stoppingCondition = false;
 
-	public ClientThread(Socket s, boolean isClient, String peerID, config cfg) 
+	public ClientThread(Socket s, boolean isClient, String peerID, config cfg)
 	{
-		
+
 		this.cfg = cfg;
 		this.requestSocket = s;
 		this.isClient = isClient;
 		util = new TCPMsgUtil();
-		
+
 		try
 		{
-			
+
 			//initialize inputStream and outputStream
 			out = new BufferedOutputStream(requestSocket.getOutputStream());
 			out.flush();
@@ -48,22 +48,22 @@ public class ClientThread extends Thread
 	        	this.peerID = peerID;
                 util.sendMessage(out, TCPMsgUtil.constructHandshakeMessage(String.valueOf(peerProcess.Id)));
                 util.receiveHandshakeMessage(in);
-                
-	        } 	        
-	        else 
+
+	        }
+	        else
 	        {
                 Integer rcv = util.receiveHandshakeMessage(in);
 	        	this.peerID = rcv.toString();
 	        	util.sendMessage(out, TCPMsgUtil.constructHandshakeMessage(String.valueOf(peerProcess.Id)));
-	        	
+
 	        }
-	        
+
 	        //peerProcess.lock.lock();
 	        //try{
 	        peerProcess.LOGGER.info("Sending bitfield message");
-	        
-	        	util.sendBitFieldMessage(out, peerProcess.bitField);	                
-		        
+
+	        	util.sendBitFieldMessage(out, peerProcess.bitField);
+
 	        	peerProcess.LOGGER.info("Receiving bitfield message");
 		        peerBitField = util.receiveBitFieldMessage(in);
 
@@ -72,7 +72,7 @@ public class ClientThread extends Thread
 		        	peerProcess.LOGGER.info("Sending interested message");
 		        	util.sendInterestedMessage(out);
 		        }
-		        else 
+		        else
 		        {
 		        	peerProcess.LOGGER.info("Sending not interested message");
 		            util.sendNotInterestedMessage(out);
@@ -80,19 +80,19 @@ public class ClientThread extends Thread
 	        //} finally {
 	        //	peerProcess.lock.unlock();
 	        //}
-	        
-	        
-		} 		
-		catch(IOException ioe) 
-		{	
+
+
+		}
+		catch(IOException ioe)
+		{
 			ioe.printStackTrace();
 		}
-		
+
 	}
 
-	public void run() 
-	{		
-		try 
+	public void run()
+	{
+		try
 		{
 			long req_time = 0l, total_time = 0l;
 			int piecesRcvd = 0;
@@ -100,29 +100,29 @@ public class ClientThread extends Thread
 			msgType = new byte[1];
 			msgLength = new byte[4];
 			int requestedIndex = 0;
-			
-		    while(!stoppingCondition) 
+
+		    while(!stoppingCondition)
 			{
-		    	
+
 		    	peerProcess.LOGGER.info("Bytes that can be read: " + String.valueOf(in.available()));
 		    	in.read(msgLength);
 		    	in.read(msgType);
-		    	
+
 		    	TCPMsgUtil.MessageType inpMsg = TCPMsgUtil.MessageType.fromValue(msgType[0]);
-		    	
+
 		    	peerProcess.LOGGER.info(inpMsg.toString());
-		    	
+
 		    	switch(inpMsg) {
 		    		case CHOKE:
 		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " is choked by " + peerID + ".");
 		    			byte indByte = peerProcess.bitField[requestedIndex/8];
-		    			
+
 		    			if(((1 << (7 - (requestedIndex%8))) & indByte) == 0) {
 		    				peerProcess.requested[requestedIndex].set(false);
 		    			}
-		    			
+
 		    			break;
-		    			
+
 		    		case UNCHOKE:
 		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " is unchoked by " + peerID + ".");
 		    			//Fetch the piece index to request
@@ -136,28 +136,28 @@ public class ClientThread extends Thread
 		    			} else {
 		    				util.sendNotInterestedMessage(out);
 		    			}
-		    			
+
 		    			break;
-		    			
+
 		    		case INTERESTED:
 		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " received the 'interested' message from " + peerID + ".");
 		    			if(!clientInterested)
 		    				clientInterested = true;
 		    			break;
-		    			
+
 		    		case NOTINTERESTED:
 		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " received the 'not interested' message from " + peerID + ".");
 		    			clientInterested = false;
 		    			choked = true;
 		    			//sendChokeMessage();
 		    			break;
-		    			
+
 		    		case HAVE:
-		    			
+
 		    			//Have message contains 4 byte piece index payload
 		    			byte[] pieceIndexbytes = util.readCompleteMsg(in, 4);
 		    			int pieceIndex = ClientHelper.bytearray_to_int(pieceIndexbytes);
-		    			
+
 		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " received the 'have' message from " + peerID + " for the piece " + pieceIndex + ".");
 		    			byte indexByte = peerProcess.bitField[pieceIndex/8];
 		    			//Checking if it has the piece, if not send interested message
@@ -165,33 +165,33 @@ public class ClientThread extends Thread
 		    				util.sendInterestedMessage(out);
 		    				peerBitField[pieceIndex/8] |=  (1 << (7 - (pieceIndex%8)));
 		    			}
-		    			
-		    			else 
-		    	        { 
+
+		    			else
+		    	        {
 		    	            util.sendNotInterestedMessage(out);
 		    	        }
 		    			break;
-		    			
+
 		    		case REQUEST:
 		    			payload = util.readCompleteMsg(in, 4);
-		    			
+
 		    			int pieceInd = ClientHelper.bytearray_to_int(payload);
-		    			
+
 		    			System.out.println("Piece Index request:" + pieceInd);
-		    			
+
 		    			int startInd = pieceInd*cfg.PieceSize;
-		    			
+
 		    			try {
 		    				byte[] data;
-		    			
+
 		    				if((cfg.FileSize-startInd) < cfg.PieceSize) {
 		    					data = Arrays.copyOfRange(peerProcess.fileData, startInd, cfg.FileSize);
-		    				} 
-		    			
+		    				}
+
 		    				else {
 		    					data = Arrays.copyOfRange(peerProcess.fileData, startInd, startInd+cfg.PieceSize);
 		    				}
-		    			 
+
 		    				if(!choked)
 		    					util.sendPieceMessage(out, pieceInd, data);
 		    			} catch(Exception e) {
@@ -199,47 +199,47 @@ public class ClientThread extends Thread
 		    				System.out.println(e.toString());
 		    			}
 		    			break;
-		    			
+
 		    		case PIECE:
 		    			byte[] pInd = new byte[4];
 		    			in.read(pInd);
-		    			
+
 		    			int pcInd = ClientHelper.bytearray_to_int(pInd);
-		    			
+
 		    			int mLen = ClientHelper.bytearray_to_int(msgLength);
 		    			System.out.println("Requested: "+requestedIndex);
 		    			System.out.println("Received: "+pcInd);
-		    			
+
 		    			byte[] pdata = util.readCompleteMsg(in, mLen-5);
-		    			
+
 		    			//Update bitField after receiving the piece
 		    			peerProcess.bitField[pcInd/8] |= 1 << (7-(pcInd%8));
-		    			
+
 		    			//Store the received piece data at the appropriate location
 		    			int start = pcInd*cfg.PieceSize;
 		    			for(int i=0;i<pdata.length;i++) {
 		    				peerProcess.fileData[start+i] = pdata[i];
 		    			}
-		    			
+
 		    			piecesRcvd++;
-		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " has downloaded the piece " + pcInd + " from " + 
+		    			peerProcess.LOGGER.info("Peer " + peerProcess.Id + " has downloaded the piece " + pcInd + " from " +
 		    					peerID + ". Now the number of pieces it has is " + piecesRcvd + ".");
-		    			
-		    			
+
+
 		    			//Update the download rate from this peer
 		    			total_time += System.nanoTime() - req_time;
 		    			downloadRate = (float) ((piecesRcvd*cfg.PieceSize)/total_time);
-		    			
+
 		    			//Send have messages to all the peers after receiving this piece
 		    			for(ClientThread ct : peerProcess.ClientThreads) {
 		    				ct.sendHaveMessage(pInd);
 		    			}
-		    			
+
 		    			//Check if this peer has any useful pieces and send another request message
 		    			pcInd = util.getPieceIndexToRequest(peerProcess.bitField, peerBitField, peerProcess.requested);
-		    			
+
 		    			System.out.println("Next Piece Index: "+pcInd);
-		    			
+
 		    			if(pcInd>=0) {
 		    				requestedIndex = pcInd;
 		    				peerProcess.requested[pcInd].set(true);
@@ -247,116 +247,95 @@ public class ClientThread extends Thread
 		    				req_time = System.currentTimeMillis();
 		    			} else {
 		    				util.sendNotInterestedMessage(out);
-		    				
+
 		    				//Check if the peer has the complete file
 		    				if(Arrays.equals(peerProcess.bitField, peerProcess.completeFile)) {
-		    					
+
 		    					//Send not interested messages to all the peers
 				    			for(ClientThread ct : peerProcess.ClientThreads) {
 				    				ct.util.sendNotInterestedMessage(out);
 				    			}
-				    			
+
 				    			new File("peer_" + peerProcess.Id).mkdir();
 				    			File file = new File("peer_" + peerProcess.Id + "/" + cfg.FileName);
-				    			
-				    			FileOutputStream fdata = new FileOutputStream(file);			
+
+				    			FileOutputStream fdata = new FileOutputStream(file);
 								fdata.write(peerProcess.fileData);
 								fdata.close();
 		    				}
 		    			}
-		    			
+
 		    			break;
-		    			
+
 		    		default:
 		    			break;
 		    	}
-			
+
 			}
-		} 
-		
+		}
+
 		catch(IOException ioException)
 		{
-				ioException.printStackTrace();				
-		} 
-		
+				ioException.printStackTrace();
+		}
+
 		finally
 		{
 			//Close connections
 			try
-			{				
+			{
 				in.close();
 				out.close();
-				requestSocket.close();				
-			} 
+				requestSocket.close();
+			}
 			catch(IOException ioException)
-			{				
-				ioException.printStackTrace();				
+			{
+				ioException.printStackTrace();
 			}
 		}
 	}
-	
+
 	//Method to send Unchoke message
 	public void sendUnchokeMessage() {
-	
+
 		//converting msg length to byte array
 		byte[] len = ClientHelper.int_to_bytearray(1);
-			
+
 		//appending message type to msg length, no payload for unchoke message
 		byte[] res = ClientHelper.append_byte_to_bytearray(len, TCPMsgUtil.MessageType.UNCHOKE.val);
-		 
+
 		util.sendMessage(out, res);
 	}
-	
+
 	//Method to send choke message
 	public void sendChokeMessage() {
-		
+
 		//converting msg length to byte array
 		byte[] len = ClientHelper.int_to_bytearray(1);
-		
+
 		//appending message type to msg length, no payload for choke message
 		byte[] res = ClientHelper.append_byte_to_bytearray(len, TCPMsgUtil.MessageType.CHOKE.val);
-		 
+
 		util.sendMessage(out, res);
 	}
-	
+
 	//Method to send have message
 	public void sendHaveMessage(byte[] pieceIndex) {
-		
+
 		//converting msg length to byte array
 		byte[] len = ClientHelper.int_to_bytearray(5);
-				
+
 		//appending message type to msg length and then the payload for have message
 		byte[] res = ClientHelper.appendByteArray(ClientHelper.append_byte_to_bytearray(len, TCPMsgUtil.MessageType.HAVE.val), pieceIndex);
-				 
+
 		util.sendMessage(out, res);
 	}
-	
+
     //Update the stopping condition to true when the method is called. This results in closing the socket connection
-    public void closeClientThread(boolean end) 
+    public void closeClientThread(boolean end)
     {
-        
+
     	stoppingCondition = end;
-        
-    	if(end == true)
-    	{
-        
-    		try
-    		{
-                if(!requestSocket.isClosed()) {
-                	if(!requestSocket.isInputShutdown())
-                		in.close();
-                	if(!requestSocket.isOutputShutdown())
-                		out.close();
-    				requestSocket.close();
-                }
-            }
-    		
-    		catch (IOException e) 
-    		{    
-               System.out.println(e.getMessage());
-    		}
-        		
-    	}
-            
+
     }
 }
